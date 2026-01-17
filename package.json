@@ -1,0 +1,21 @@
+{
+  "name": "yeetcoder",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:web",
+    "dev:web": "npm run dev -w packages/web",
+    "dev:server": "npm run dev -w packages/server",
+    "build": "npm run build -w packages/web && npm run build -w packages/server",
+    "build:web": "npm run build -w packages/web",
+    "build:server": "npm run build -w packages/server",
+    "lint": "npm run lint -w packages/web && npm run lint -w packages/server",
+    "typecheck": "npm run typecheck -w packages/web && npm run typecheck -w packages/server"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
