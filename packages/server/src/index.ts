@@ -3,6 +3,7 @@ import cors from 'cors'
 import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
 import 'dotenv/config'
+import executionRoutes from './routes/execution'
 
 import topicsRoutes from './routes/topics'
 
@@ -21,6 +22,9 @@ app.get('/api/health', (_req, res) => {
 
 // Routes
 app.use('/api/topics', topicsRoutes)
+
+// Execution routes
+app.use('/api/execute', executionRoutes)
 
 // WebSocket handling
 wss.on('connection', (ws) => {
