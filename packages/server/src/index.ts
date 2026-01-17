@@ -4,6 +4,8 @@ import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
 import 'dotenv/config'
 
+import topicsRoutes from './routes/topics'
+
 const app = express()
 const server = createServer(app)
 const wss = new WebSocketServer({ server, path: '/ws' })
@@ -17,10 +19,8 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Topics routes (placeholder)
-app.get('/api/topics', (_req, res) => {
-  res.json({ topics: [] })
-})
+// Routes
+app.use('/api/topics', topicsRoutes)
 
 // WebSocket handling
 wss.on('connection', (ws) => {
