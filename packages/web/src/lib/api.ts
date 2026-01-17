@@ -17,10 +17,37 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   return response.json()
 }
 
+export type Difficulty = 'easy' | 'medium' | 'hard'
+
+export interface StarterCode {
+  python: string
+  javascript: string
+  typescript: string
+  java: string
+  cpp: string
+}
+
+export interface QuestionData {
+  title: string
+  description: string
+  examples: { input: string; output: string; explanation?: string }[]
+  constraints: string[]
+  visible_test_cases: { input: string; expected_output: string }[]
+  hidden_test_cases: { input: string; expected_output: string }[]
+  starter_code: StarterCode
+}
+
 export const api = {
   topics: {
     list: () => fetchApi<{ topics: Topic[] }>('/api/topics'),
     weakest: () => fetchApi<{ topics: Topic[]; message?: string }>('/api/topics/weakest'),
+  },
+  questions: {
+    generate: (params: { topic: string; difficulty: Difficulty; topicId?: string }) =>
+      fetchApi<{ question: QuestionData; topicId?: string }>('/api/questions/generate', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
   },
 }
 
