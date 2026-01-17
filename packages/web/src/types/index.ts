@@ -32,6 +32,14 @@ export interface InterviewSession {
   transcript: TranscriptEntry[]
 }
 
+export interface StarterCode {
+  python: string
+  javascript: string
+  typescript: string
+  java: string
+  cpp: string
+}
+
 export interface QuestionData {
   title: string
   description: string
@@ -39,6 +47,7 @@ export interface QuestionData {
   constraints: string[]
   visible_test_cases: TestCase[]
   hidden_test_cases: TestCase[]
+  starter_code: StarterCode
 }
 
 export interface Example {

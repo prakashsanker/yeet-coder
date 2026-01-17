@@ -6,6 +6,7 @@ import 'dotenv/config'
 import executionRoutes from './routes/execution'
 
 import topicsRoutes from './routes/topics'
+import questionsRoutes from './routes/questions'
 
 const app = express()
 const server = createServer(app)
@@ -22,6 +23,7 @@ app.get('/api/health', (_req, res) => {
 
 // Routes
 app.use('/api/topics', topicsRoutes)
+app.use('/api/questions', questionsRoutes)
 
 // Execution routes
 app.use('/api/execute', executionRoutes)
