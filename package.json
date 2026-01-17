@@ -6,14 +6,15 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev:server & npm run dev:web",
-    "dev:web": "npm run dev -w packages/web",
-    "dev:server": "npm run dev -w packages/server",
-    "build": "npm run build -w packages/web && npm run build -w packages/server",
-    "build:web": "npm run build -w packages/web",
-    "build:server": "npm run build -w packages/server",
-    "lint": "npm run lint -w packages/web && npm run lint -w packages/server",
-    "typecheck": "npm run typecheck -w packages/web && npm run typecheck -w packages/server"
+    "dev": "yarn dev:server & yarn dev:web",
+    "dev:web": "yarn workspace @yeetcoder/web dev",
+    "dev:server": "yarn workspace @yeetcoder/server dev",
+    "build": "yarn workspace @yeetcoder/web build && yarn workspace @yeetcoder/server build",
+    "build:web": "yarn workspace @yeetcoder/web build",
+    "build:server": "yarn workspace @yeetcoder/server build",
+    "lint": "yarn workspace @yeetcoder/web lint && yarn workspace @yeetcoder/server lint",
+    "typecheck": "yarn workspace @yeetcoder/web typecheck && yarn workspace @yeetcoder/server typecheck",
+    "db:push": "supabase db push"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

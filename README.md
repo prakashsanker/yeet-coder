@@ -100,8 +100,11 @@ AI-powered coding interview practice tool with voice interaction, dynamic questi
 │       └── tsconfig.json
 │
 ├── /supabase
-│   └── /migrations
-│       └── 001_initial_schema.sql
+│   ├── config.toml
+│   ├── /migrations
+│   │   └── 20240117000000_initial_schema.sql
+│   └── /seed
+│       └── topics.sql
 │
 ├── package.json                      # Workspace root
 ├── .env.example
@@ -123,7 +126,7 @@ AI-powered coding interview practice tool with voice interaction, dynamic questi
 | Configure Tailwind CSS | ✅ |
 | Create database migration file | ✅ |
 | Set up environment variable templates | ✅ |
-| Create Supabase project & run migrations | ⬜ (manual) |
+| Set up Supabase CLI | ✅ |
 
 **Files:**
 - `package.json` (root)
@@ -134,7 +137,9 @@ AI-powered coding interview practice tool with voice interaction, dynamic questi
 - `packages/server/tsconfig.json`
 - `packages/server/src/index.ts`
 - `packages/server/src/db/supabase.ts`
-- `supabase/migrations/001_initial_schema.sql`
+- `supabase/config.toml`
+- `supabase/migrations/20240117000000_initial_schema.sql`
+- `supabase/seed/topics.sql`
 
 ---
 
@@ -463,17 +468,34 @@ VITE_SUPABASE_ANON_KEY=
 
 ```bash
 # Install dependencies
-npm install
+yarn
 
 # Start development servers
-npm run dev
+yarn dev
 
 # Run backend only
-npm run dev:server
+yarn dev:server
 
 # Run frontend only
-npm run dev:web
+yarn dev:web
 ```
+
+## Database Setup (Supabase)
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Link your project:
+   ```bash
+   supabase link --project-ref <your-project-ref>
+   # Enter your database password when prompted
+   ```
+3. Push migrations:
+   ```bash
+   yarn db:push
+   ```
+4. Seed the topics table (run in Supabase Dashboard → SQL Editor):
+   - Copy contents of `supabase/seed/topics.sql` and execute
+
+5. Set environment variables (see `.env.example`)
 
 ---
 
