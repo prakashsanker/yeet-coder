@@ -144,7 +144,7 @@ AI-powered coding interview practice tool with voice interaction, dynamic questi
 ---
 
 ### Phase 2: Landing Page & Topics
-**Status:** 🔴 Not Started
+**Status:** 🟢 Complete
 
 **Landing Page Design:**
 ```
@@ -165,12 +165,12 @@ AI-powered coding interview practice tool with voice interaction, dynamic questi
 
 | Task | Status |
 |------|--------|
-| Build Landing page (two buttons) | ⬜ |
-| Build TopicSelectModal (list of all topics) | ⬜ |
-| Build WeaknessSelectModal (top 3 weak topics) | ⬜ |
-| Implement GET /api/topics endpoint | ⬜ |
-| Implement GET /api/topics/weakest endpoint | ⬜ |
-| Seed topics table with NeetCode data | ⬜ |
+| Build Landing page (two buttons) | ✅ |
+| Build TopicSelectModal (list of all topics) | ✅ |
+| Build WeaknessSelectModal (top 3 weak topics) | ✅ |
+| Implement GET /api/topics endpoint | ✅ |
+| Implement GET /api/topics/weakest endpoint | ✅ |
+| Seed topics table with NeetCode data | ✅ |
 
 **Files:**
 - `packages/web/src/pages/Landing.tsx`
