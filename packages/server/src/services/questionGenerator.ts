@@ -67,7 +67,18 @@ IMPORTANT:
 - Hidden test cases should include edge cases and larger inputs
 - Starter code must have proper function signatures matching the problem
 - For Python, include type hints and import List from typing if needed
-- For test cases, the input format should match what the starter code expects`
+- For test cases, the input format should match what the starter code expects
+
+CRITICAL JSON FORMATTING RULES:
+- Return ONLY valid JSON, no markdown code blocks, no explanatory text
+- NO trailing commas after the last item in arrays or objects
+- All strings must use double quotes, not single quotes
+- NEVER put actual line breaks inside string values - always use the escape sequence \\n
+- Escape special characters: \\n for newlines, \\t for tabs, \\" for quotes, \\\\ for backslash
+- Control characters (ASCII 0-31) are FORBIDDEN inside strings - use escape sequences instead
+- Do NOT include comments in the JSON
+- Keep code in starter_code on a SINGLE LINE using \\n for line breaks
+- Verify your JSON is valid before responding`
 
 export async function generateQuestion(
   options: GenerateQuestionOptions

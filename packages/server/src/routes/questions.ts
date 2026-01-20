@@ -11,13 +11,17 @@ const generateQuestionSchema = z.object({
 })
 
 router.post('/generate', async (req, res) => {
+  console.log('[Questions] POST /generate called', { topic: req.body.topic, difficulty: req.body.difficulty })
+
   try {
     const body = generateQuestionSchema.parse(req.body)
 
+    console.log('[Questions] Generating question for topic:', body.topic)
     const question = await questionGenerator.generate({
       topic: body.topic,
       difficulty: body.difficulty as Difficulty,
     })
+    console.log('[Questions] Question generated successfully:', question.title)
 
     res.json({ question, topicId: body.topicId })
   } catch (error) {

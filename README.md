@@ -226,22 +226,23 @@ AI-powered coding interview practice tool with voice interaction, dynamic questi
 ---
 
 ### Phase 5: Voice Integration
-**Status:** 🔴 Not Started
+**Status:** 🟢 Complete
 
 | Task | Status |
 |------|--------|
-| Set up WebSocket server | ⬜ |
-| Implement WhisperFlow voice handler | ⬜ |
-| Implement Cartesia TTS service | ⬜ |
-| Build AI interviewer service | ⬜ |
-| Build VoiceAvatar component | ⬜ |
-| Build useVoiceInteraction hook | ⬜ |
+| Set up WebSocket server | ✅ |
+| Implement WhisperFlow voice handler | ✅ |
+| Implement Cartesia TTS service | ✅ |
+| Build AI interviewer service | ✅ |
+| Build VoiceAvatar component | ✅ |
+| Build useVoiceInteraction hook | ✅ |
 
 **Files:**
 - `packages/server/src/websocket/index.ts`
 - `packages/server/src/websocket/voiceHandler.ts`
 - `packages/server/src/services/cartesia.ts`
 - `packages/server/src/services/interviewer.ts`
+- `packages/server/src/services/llm.ts`
 - `packages/server/src/routes/voice.ts`
 - `packages/web/src/components/interview/VoiceAvatar.tsx`
 - `packages/web/src/hooks/useVoiceInteraction.ts`

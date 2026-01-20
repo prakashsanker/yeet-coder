@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// Use relative URLs by default so requests go through Vite's proxy
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${endpoint}`, {
