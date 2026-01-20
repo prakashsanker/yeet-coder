@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 
 export type LLMModel =
+  | 'anthropic/claude-opus-4'
   | 'anthropic/claude-sonnet-4'
   | 'openai/gpt-4o'
   | 'openai/gpt-4o-mini'
@@ -19,7 +20,7 @@ export interface LLMOptions {
   maxTokens?: number
 }
 
-const DEFAULT_MODEL: LLMModel = 'anthropic/claude-sonnet-4'
+const DEFAULT_MODEL: LLMModel = 'anthropic/claude-opus-4'
 
 function getClient(): OpenAI {
   if (!OPENROUTER_API_KEY) {
@@ -98,10 +99,17 @@ export async function generateJSON<T>(
     throw new Error('No content in LLM response')
   }
 
-  // Strip markdown code blocks if present
+  // Strip markdown code blocks if present (LLMs sometimes wrap despite instructions)
   const jsonContent = stripMarkdownCodeBlocks(content)
 
-  return JSON.parse(jsonContent) as T
+  try {
+    return JSON.parse(jsonContent) as T
+  } catch (error) {
+    // Log the problematic JSON for debugging
+    console.error('Failed to parse JSON from LLM. Raw content:')
+    console.error(jsonContent.slice(0, 500) + '...')
+    throw error
+  }
 }
 
 export const llm = {
