@@ -11,20 +11,24 @@ const CARTESIA_VERSION = '2025-04-16'
 
 // Available Cartesia voices
 export type CartesiaVoice =
+  | 'theo'        // Male, steady, confident - good for interviews
+  | 'ronald'      // Male, deep, thoughtful
   | 'kiefer'      // Male, professional
   | 'katie'       // Female, friendly
-  | 'customer-support-man'
+  | 'blake'       // Male, energetic support
 
 // Voice ID mapping
 const VOICE_IDS: Record<CartesiaVoice, string> = {
-  'kiefer': '228fca29-3a0a-435c-8728-5cb483251068',
-  'katie': 'f786b574-daa5-4673-aa0c-cbe3e8534c02',
-  'customer-support-man': 'a167e0f3-df7e-4d52-a9c3-f949145efdab',
+  'theo': '79f8b5fb-2cc8-479a-80df-29f7a7cf1a3e',      // Steady, enunciating, confident young male
+  'ronald': '5ee9feff-1265-424a-9d7f-8e4d431a12c7',   // Intense, deep young adult male
+  'kiefer': '228fca29-3a0a-435c-8728-5cb483251068',   // Professional male
+  'katie': 'f786b574-daa5-4673-aa0c-cbe3e8534c02',    // Friendly female
+  'blake': 'a167e0f3-df7e-4d52-a9c3-f949145efdab',    // Energetic adult male
 }
 
 export interface CartesiaTTSOptions {
   voice?: CartesiaVoice
-  speed?: 'slowest' | 'slow' | 'normal' | 'fast' | 'fastest'
+  speed?: number // Speed multiplier: 0.6 (slow) to 1.5 (fast), 1.0 = normal
   language?: string
 }
 
@@ -44,7 +48,9 @@ export async function textToSpeech(
     throw new Error('CARTESIA_API_KEY is not configured')
   }
 
-  const { voice = 'kiefer', speed = 'normal', language = 'en' } = options
+  // Default to Ronald (deep, thoughtful voice) at slightly slower speed
+  // Valid range: 0.6 (slow) to 1.5 (fast), 1.0 = normal
+  const { voice = 'kiefer', speed = 1.0, language = 'en' } = options
   const voiceId = VOICE_IDS[voice]
 
   console.log('[CARTESIA] Using voice:', voice, 'voiceId:', voiceId, 'speed:', speed)
@@ -58,11 +64,12 @@ export async function textToSpeech(
     },
     output_format: {
       container: 'mp3',
-      sample_rate: 24000,
-      bit_rate: 128000,
+      sample_rate: 44100,  // CD quality - higher fidelity
+      bit_rate: 192000,    // Higher bitrate for better quality
     },
     language,
-    ...(speed !== 'normal' && {
+    // Only include speed if not default (1.0)
+    ...(speed !== 1.0 && {
       generation_config: {
         speed,
       },
@@ -103,9 +110,11 @@ export async function textToSpeech(
  */
 export function getAvailableVoices(): { id: CartesiaVoice; name: string; description: string }[] {
   return [
-    { id: 'kiefer', name: 'Kiefer', description: 'Male, professional voice - good for interviews' },
-    { id: 'katie', name: 'Katie', description: 'Female, friendly voice' },
-    { id: 'customer-support-man', name: 'Support', description: 'Male, customer support voice' },
+    { id: 'theo', name: 'Theo', description: 'Steady, confident male - ideal for interviews (default)' },
+    { id: 'ronald', name: 'Ronald', description: 'Deep, thoughtful male voice' },
+    { id: 'kiefer', name: 'Kiefer', description: 'Professional male voice' },
+    { id: 'katie', name: 'Katie', description: 'Friendly female voice' },
+    { id: 'blake', name: 'Blake', description: 'Energetic male voice' },
   ]
 }
 
@@ -259,10 +268,13 @@ export class StreamingSTTSession {
   private options: StreamingSTTOptions
   private isConnected = false
   private isEnded = false
+  private isDoneSignaled = false // Track if we've signaled done to stop accepting audio
   private transcriptBuffer = ''
   private connectionTimeout: NodeJS.Timeout | null = null
   private silenceTimeout: NodeJS.Timeout | null = null
-  private readonly SILENCE_TIMEOUT_MS = 2000 // 2 seconds of no audio = done
+  private doneResponseTimeout: NodeJS.Timeout | null = null // Fallback if Cartesia doesn't respond
+  private readonly SILENCE_TIMEOUT_MS = 2000 // 2 seconds of no new transcript = done
+  private readonly DONE_RESPONSE_TIMEOUT_MS = 1000 // 1 second to wait for Cartesia's done response
 
   constructor(callbacks: StreamingSTTCallbacks, options: StreamingSTTOptions = {}) {
     this.callbacks = callbacks
@@ -290,10 +302,11 @@ export class StreamingSTTSession {
       const wsUrl = `${CARTESIA_STT_URL}?${params.toString()}`
       console.log('[CARTESIA STREAM] Connecting to:', wsUrl.replace(CARTESIA_API_KEY!, 'sk-***'))
 
-      // Connect with headers for additional auth
+      // Connect with headers for additional auth (including required Cartesia-Version)
       this.ws = new WebSocket(wsUrl, {
         headers: {
           'X-API-Key': CARTESIA_API_KEY!,
+          'Cartesia-Version': CARTESIA_VERSION,
         },
       })
 
@@ -385,14 +398,16 @@ export class StreamingSTTSession {
    * @param audioData - Raw audio buffer (not base64)
    */
   sendAudioChunk(audioData: Buffer): void {
-    if (!this.isConnected || !this.ws || this.isEnded) {
-      console.warn('[CARTESIA STREAM] Cannot send: not connected or ended')
+    if (!this.isConnected || !this.ws || this.isEnded || this.isDoneSignaled) {
+      // Don't log warning for isDoneSignaled - it's expected behavior
+      if (!this.isDoneSignaled) {
+        console.warn('[CARTESIA STREAM] Cannot send: not connected or ended')
+      }
       return
     }
 
-    // Reset silence timeout since we're receiving audio
-    this.resetSilenceTimeout()
-
+    // Don't reset silence timeout here - only reset when we receive transcripts
+    // This allows the timeout to fire after user stops speaking
     this.ws.send(audioData)
   }
 
@@ -408,8 +423,9 @@ export class StreamingSTTSession {
     if (this.silenceTimeout) {
       clearTimeout(this.silenceTimeout)
     }
+    console.log('[CARTESIA STREAM] Starting silence timeout (%dms)', this.SILENCE_TIMEOUT_MS)
     this.silenceTimeout = setTimeout(() => {
-      console.log('[CARTESIA STREAM] Silence timeout - ending session')
+      console.log('[CARTESIA STREAM] Silence timeout fired - ending session')
       this.signalDone()
     }, this.SILENCE_TIMEOUT_MS)
   }
@@ -418,17 +434,25 @@ export class StreamingSTTSession {
    * Signal to Cartesia that we're done sending audio
    */
   signalDone(): void {
-    if (!this.isConnected || !this.ws || this.isEnded) {
+    if (!this.isConnected || !this.ws || this.isEnded || this.isDoneSignaled) {
       return
     }
 
     console.log('[CARTESIA STREAM] Signaling done to Cartesia')
+    this.isDoneSignaled = true // Stop accepting more audio
+
     if (this.silenceTimeout) {
       clearTimeout(this.silenceTimeout)
       this.silenceTimeout = null
     }
 
     this.ws.send(JSON.stringify({ type: 'done' }))
+
+    // Fallback: if Cartesia doesn't respond with 'done' within 1 second, end anyway
+    this.doneResponseTimeout = setTimeout(() => {
+      console.log('[CARTESIA STREAM] Cartesia did not respond with done, forcing end')
+      this.endSession()
+    }, this.DONE_RESPONSE_TIMEOUT_MS)
   }
 
   private endSession(): void {
@@ -438,6 +462,10 @@ export class StreamingSTTSession {
     if (this.silenceTimeout) {
       clearTimeout(this.silenceTimeout)
       this.silenceTimeout = null
+    }
+    if (this.doneResponseTimeout) {
+      clearTimeout(this.doneResponseTimeout)
+      this.doneResponseTimeout = null
     }
 
     this.callbacks.onDone(this.transcriptBuffer)
@@ -452,6 +480,10 @@ export class StreamingSTTSession {
     if (this.silenceTimeout) {
       clearTimeout(this.silenceTimeout)
       this.silenceTimeout = null
+    }
+    if (this.doneResponseTimeout) {
+      clearTimeout(this.doneResponseTimeout)
+      this.doneResponseTimeout = null
     }
     if (this.ws) {
       this.ws.close()

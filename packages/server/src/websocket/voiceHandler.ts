@@ -90,10 +90,12 @@ async function startVoiceSession(ws: InterviewWebSocket, sampleRate?: number): P
           // Generate AI response
           await generateAndSendResponse(ws, finalText)
         } else {
-          sendMessage(ws, { type: 'error', message: 'No speech detected' })
+          console.log('[VOICE] No speech detected, skipping response')
         }
-        // Reset for next utterance
-        ws.voiceSession!.isRecording = false
+        // Reset for next utterance (check voiceSession exists first)
+        if (ws.voiceSession) {
+          ws.voiceSession.isRecording = false
+        }
       },
     },
     { sampleRate: actualSampleRate }
@@ -193,13 +195,15 @@ async function generateAndSendResponse(ws: InterviewWebSocket, userText: string)
 
   try {
     // Get AI interviewer response
-    console.log('[VOICE] Getting AI response...')
+    console.log('[VOICE] Getting AI response for user input:', userText)
     const response = await getInterviewerResponse(
       ws.voiceSession.interviewContext.transcript,
       ws.voiceSession.interviewContext.currentQuestion,
       ws.voiceSession.interviewContext.userCode
     )
-    console.log('[VOICE] AI response:', response.slice(0, 100))
+    console.log('[VOICE] ====== AI RESPONSE ======')
+    console.log('[VOICE]', response)
+    console.log('[VOICE] ============================')
 
     // Add interviewer response to transcript
     ws.voiceSession.interviewContext.transcript.push({

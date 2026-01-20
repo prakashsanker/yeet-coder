@@ -16,6 +16,7 @@ interface UseVoiceInteractionOptions {
   userCode?: string
   onTranscriptUpdate?: (transcript: TranscriptEntry[]) => void
   onInterviewerResponse?: (text: string) => void
+  autoStartListening?: boolean // Auto-start listening after intro
 }
 
 type WebSocketMessage =
@@ -31,12 +32,19 @@ export function useVoiceInteraction({
   userCode = '',
   onTranscriptUpdate,
   onInterviewerResponse,
+  autoStartListening = true,
 }: UseVoiceInteractionOptions) {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle')
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isListening, setIsListening] = useState(false)
+
+  // Use ref for isListening so callbacks always get current value
+  const isListeningRef = useRef(false)
+  const [isListening, setIsListeningState] = useState(false)
+
+  // Track if microphone is set up
+  const isMicSetupRef = useRef(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -44,6 +52,12 @@ export function useVoiceInteraction({
   const streamRef = useRef<MediaStream | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+
+  // Sync ref with state
+  const setIsListening = useCallback((value: boolean) => {
+    isListeningRef.current = value
+    setIsListeningState(value)
+  }, [])
 
   // Connect to WebSocket
   const connect = useCallback(() => {
@@ -83,6 +97,23 @@ export function useVoiceInteraction({
 
     wsRef.current = ws
   }, [interviewId])
+
+  // Start a new STT session (assumes microphone is already set up)
+  const startSTTSession = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('[VOICE] Cannot start STT session: WebSocket not connected')
+      return
+    }
+
+    const sampleRate = audioContextRef.current?.sampleRate || 16000
+    console.log('[VOICE] Starting new STT session with sample rate:', sampleRate)
+    wsRef.current.send(
+      JSON.stringify({
+        type: 'voice_start',
+        sample_rate: sampleRate,
+      })
+    )
+  }, [])
 
   // Handle incoming WebSocket messages
   const handleWebSocketMessage = useCallback(
@@ -133,9 +164,10 @@ export function useVoiceInteraction({
           if (message.audio) {
             playAudio(message.audio)
           } else {
-            // Go back to listening if still in listening mode
-            if (isListening) {
-              restartVoiceSession()
+            // No audio - restart listening immediately if in always-on mode
+            if (isListeningRef.current) {
+              console.log('[VOICE] No audio, restarting STT session immediately')
+              startSTTSession()
             } else {
               setVoiceState('idle')
             }
@@ -145,17 +177,31 @@ export function useVoiceInteraction({
         case 'error':
           console.error('[WS] Error:', message.message)
           setError(message.message)
-          setVoiceState('idle')
+          // On error, try to restart if in always-on mode
+          if (isListeningRef.current) {
+            console.log('[VOICE] Error occurred, will retry STT session in 1s')
+            setTimeout(() => {
+              if (isListeningRef.current) {
+                startSTTSession()
+              }
+            }, 1000)
+          } else {
+            setVoiceState('idle')
+          }
           break
       }
     },
-    [onTranscriptUpdate, onInterviewerResponse, isListening]
+    [onTranscriptUpdate, onInterviewerResponse, startSTTSession]
   )
 
   // Play audio from base64
   const playAudio = useCallback(async (base64Audio: string) => {
     if (!base64Audio) {
-      setVoiceState('idle')
+      if (isListeningRef.current) {
+        startSTTSession()
+      } else {
+        setVoiceState('idle')
+      }
       return
     }
 
@@ -182,9 +228,11 @@ export function useVoiceInteraction({
       source.connect(playbackContextRef.current.destination)
 
       source.onended = () => {
-        // After speaking, restart voice session if still listening
-        if (isListening) {
-          restartVoiceSession()
+        console.log('[AUDIO] Playback ended, isListening:', isListeningRef.current)
+        // After speaking, restart STT session if in always-on mode
+        if (isListeningRef.current) {
+          console.log('[VOICE] Audio finished, starting new STT session')
+          startSTTSession()
         } else {
           setVoiceState('idle')
         }
@@ -193,17 +241,13 @@ export function useVoiceInteraction({
       source.start(0)
     } catch (err) {
       console.error('[AUDIO] Failed to play:', err)
-      setVoiceState('idle')
+      if (isListeningRef.current) {
+        startSTTSession()
+      } else {
+        setVoiceState('idle')
+      }
     }
-  }, [isListening])
-
-  // Restart voice session (for continuous listening mode)
-  const restartVoiceSession = useCallback(() => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-
-    console.log('[VOICE] Restarting voice session for next utterance')
-    wsRef.current.send(JSON.stringify({ type: 'voice_start' }))
-  }, [])
+  }, [startSTTSession])
 
   // Convert Float32 audio samples to Int16 (PCM s16le)
   const float32ToInt16 = useCallback((float32Array: Float32Array): Int16Array => {
@@ -226,13 +270,15 @@ export function useVoiceInteraction({
     return btoa(binary)
   }, [])
 
-  // Start streaming audio to server
-  const startListening = useCallback(async () => {
-    if (voiceState !== 'idle') return
+  // Set up microphone (one-time setup)
+  const setupMicrophone = useCallback(async () => {
+    if (isMicSetupRef.current) {
+      console.log('[MIC] Already set up')
+      return true
+    }
 
     try {
       console.log('[MIC] Requesting microphone access...')
-      // Request microphone with specific sample rate
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
@@ -244,7 +290,6 @@ export function useVoiceInteraction({
       streamRef.current = stream
 
       // Create AudioContext at 16kHz for recording
-      // Note: Browser may not honor the sample rate, so we'll resample if needed
       const audioContext = new AudioContext({ sampleRate: 16000 })
       audioContextRef.current = audioContext
 
@@ -253,20 +298,16 @@ export function useVoiceInteraction({
       sourceRef.current = source
 
       // Create ScriptProcessorNode to capture raw PCM samples
-      // Buffer size of 4096 at 16kHz = 256ms of audio per chunk
       const processor = audioContext.createScriptProcessor(4096, 1, 1)
       processorRef.current = processor
 
       processor.onaudioprocess = (e) => {
+        // Only send if WebSocket is open and we're in listening mode
         if (wsRef.current?.readyState !== WebSocket.OPEN) return
+        if (!isListeningRef.current) return
 
-        // Get raw float32 audio data from input channel
         const float32Data = e.inputBuffer.getChannelData(0)
-
-        // Convert to Int16 (PCM s16le) format
         const int16Data = float32ToInt16(float32Data)
-
-        // Convert to base64 and send to server
         const base64Audio = int16ToBase64(int16Data)
 
         wsRef.current.send(
@@ -277,69 +318,57 @@ export function useVoiceInteraction({
         )
       }
 
-      // Connect: source -> processor -> destination (required for processor to work)
+      // Connect: source -> processor -> destination
       source.connect(processor)
       processor.connect(audioContext.destination)
 
-      console.log('[MIC] Recording started at', audioContext.sampleRate, 'Hz, streaming PCM to server')
-
-      // Tell server to start voice session (connects to Cartesia)
-      // Pass the actual sample rate so server can configure Cartesia correctly
-      wsRef.current?.send(
-        JSON.stringify({
-          type: 'voice_start',
-          sample_rate: audioContext.sampleRate,
-        })
-      )
-
-      setIsListening(true)
-      setError(null)
+      console.log('[MIC] Setup complete, sample rate:', audioContext.sampleRate)
+      isMicSetupRef.current = true
+      return true
     } catch (err) {
       console.error('[MIC] Failed to access microphone:', err)
       setError('Microphone access denied')
+      return false
     }
-  }, [voiceState, float32ToInt16, int16ToBase64])
+  }, [float32ToInt16, int16ToBase64])
 
-  // Stop listening
-  const stopListening = useCallback(() => {
-    console.log('[MIC] Stopping listening')
+  // Enable always-on listening mode
+  const enableAlwaysListening = useCallback(async () => {
+    console.log('[VOICE] Enabling always-on listening')
 
-    // Disconnect and clean up audio processor
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
-
-    if (sourceRef.current) {
-      sourceRef.current.disconnect()
-      sourceRef.current = null
+    // Set up microphone if not already done
+    const micReady = await setupMicrophone()
+    if (!micReady) {
+      console.error('[VOICE] Failed to set up microphone')
+      return
     }
 
-    // Close audio context (but keep playback context)
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
+    setIsListening(true)
+    setError(null)
 
-    // Stop microphone stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-    }
+    // Start the first STT session
+    startSTTSession()
+  }, [setupMicrophone, setIsListening, startSTTSession])
 
-    // Tell server to stop voice session
-    wsRef.current?.send(JSON.stringify({ type: 'voice_stop' }))
-
+  // Disable always-on listening mode
+  const disableAlwaysListening = useCallback(() => {
+    console.log('[VOICE] Disabling always-on listening')
     setIsListening(false)
+
+    // Tell server to stop current voice session
+    wsRef.current?.send(JSON.stringify({ type: 'voice_stop' }))
     setVoiceState('idle')
-  }, [])
+  }, [setIsListening])
+
+  // Legacy startListening for backwards compatibility
+  const startListening = enableAlwaysListening
+  const stopListening = disableAlwaysListening
 
   // Send text input (fallback for no-mic scenarios)
   const sendTextInput = useCallback(
     async (text: string) => {
       if (!text.trim()) return
 
-      // Add user message to transcript
       const userEntry: TranscriptEntry = {
         timestamp: Date.now(),
         speaker: 'user',
@@ -353,7 +382,6 @@ export function useVoiceInteraction({
 
       setVoiceState('processing')
 
-      // Send via WebSocket if connected
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -362,7 +390,6 @@ export function useVoiceInteraction({
           })
         )
       } else {
-        // Fallback to REST API
         await sendTextInputRest(text)
       }
     },
@@ -511,10 +538,10 @@ export function useVoiceInteraction({
     }
   }, [currentQuestion, onTranscriptUpdate, onInterviewerResponse, playAudio])
 
-  // Play a pre-cached introduction
+  // Play a pre-cached introduction and auto-enable listening after
   const playCachedIntroduction = useCallback(
-    (cachedIntro: { text: string; audio?: string }) => {
-      console.log('[VOICE] Playing cached introduction')
+    async (cachedIntro: { text: string; audio?: string }) => {
+      console.log('[VOICE] Playing cached introduction, autoStartListening:', autoStartListening)
 
       const introEntry: TranscriptEntry = {
         timestamp: Date.now(),
@@ -528,13 +555,28 @@ export function useVoiceInteraction({
       })
       onInterviewerResponse?.(cachedIntro.text)
 
+      // If auto-start is enabled, set up microphone and enable listening
+      // This way when audio finishes, it will auto-start the STT session
+      if (autoStartListening) {
+        console.log('[VOICE] Setting up microphone for always-on listening')
+        const micReady = await setupMicrophone()
+        if (micReady) {
+          setIsListening(true)
+        }
+      }
+
       if (cachedIntro.audio) {
         playAudio(cachedIntro.audio)
       } else {
-        setVoiceState('idle')
+        // No audio - start listening immediately if enabled
+        if (autoStartListening && isListeningRef.current) {
+          startSTTSession()
+        } else {
+          setVoiceState('idle')
+        }
       }
     },
-    [onTranscriptUpdate, onInterviewerResponse, playAudio]
+    [onTranscriptUpdate, onInterviewerResponse, playAudio, autoStartListening, setupMicrophone, setIsListening, startSTTSession]
   )
 
   // Connect on mount
@@ -576,11 +618,11 @@ export function useVoiceInteraction({
     requestHint,
     requestIntroduction,
     playCachedIntroduction,
-    // Backwards compatibility aliases
+    // Always-listening mode
     isAlwaysListening: isListening,
     isSpeechDetected: voiceState === 'listening',
-    enableAlwaysListening: startListening,
-    disableAlwaysListening: stopListening,
+    enableAlwaysListening,
+    disableAlwaysListening,
     currentTranscript: '', // No longer used - we don't show partial transcripts
   }
 }
