@@ -9,9 +9,9 @@ export interface InterviewWebSocket extends WebSocket {
 
 export type WebSocketMessage =
   | { type: 'join_interview'; interview_id: string }
-  | { type: 'audio_chunk'; data: string } // base64 encoded PCM audio (s16le)
+  | { type: 'audio_chunk'; data: string } // base64 encoded audio
   | { type: 'code_update'; code: string }
-  | { type: 'voice_start'; sample_rate?: number } // sample_rate in Hz (default 16000)
+  | { type: 'voice_start' }
   | { type: 'voice_stop' }
   | { type: 'text_input'; text: string } // For text-based fallback
 

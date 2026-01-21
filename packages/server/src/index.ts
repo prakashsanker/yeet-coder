@@ -7,6 +7,7 @@ import executionRoutes from './routes/execution'
 import topicsRoutes from './routes/topics'
 import questionsRoutes from './routes/questions'
 import voiceRoutes from './routes/voice'
+import interviewsRoutes from './routes/interviews'
 import { setupWebSocket } from './websocket'
 
 const DEFAULT_PORT = parseInt(process.env.PORT || '3001', 10)
@@ -66,12 +67,12 @@ async function main() {
   app.use('/api/questions', questionsRoutes)
   app.use('/api/execute', executionRoutes)
   app.use('/api/voice', voiceRoutes)
+  app.use('/api/interviews', interviewsRoutes)
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`)
     console.log(`WebSocket server running on ws://localhost:${port}/ws/interview`)
     console.log(`GROQ_API_KEY: ${process.env.GROQ_API_KEY ? 'Set (' + process.env.GROQ_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
-    console.log(`CARTESIA_API_KEY: ${process.env.CARTESIA_API_KEY ? 'Set (' + process.env.CARTESIA_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
   })
 }
 

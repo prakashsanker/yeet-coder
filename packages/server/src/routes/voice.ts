@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from 'express'
 import {
-  textToSpeech as cartesiaTTS,
-  speechToText as cartesiaSTT,
-  getAvailableVoices as getCartesiaVoices,
-  isConfigured as isCartesiaConfigured,
-  type CartesiaVoice,
-} from '../services/cartesia'
+  textToSpeech,
+  speechToText,
+  getAvailableVoices,
+  isConfigured as isOpenAIConfigured,
+  type OpenAIVoice,
+} from '../services/openai-voice'
 import { getInterviewerResponse, generateHint, analyzeApproach } from '../services/interviewer'
 
 const router = Router()
@@ -16,7 +16,7 @@ interface TranscriptEntry {
   text: string
 }
 
-// POST /api/voice/synthesize - Convert text to speech (using Cartesia)
+// POST /api/voice/synthesize - Convert text to speech
 router.post('/synthesize', async (req: Request, res: Response) => {
   try {
     const { text, voice, speed } = req.body
@@ -26,13 +26,13 @@ router.post('/synthesize', async (req: Request, res: Response) => {
       return
     }
 
-    if (!isCartesiaConfigured()) {
-      res.status(503).json({ error: 'Cartesia TTS not configured' })
+    if (!isOpenAIConfigured()) {
+      res.status(503).json({ error: 'OpenAI TTS not configured' })
       return
     }
 
-    const audio = await cartesiaTTS(text, {
-      voice: voice as CartesiaVoice,
+    const audio = await textToSpeech(text, {
+      voice: voice as OpenAIVoice,
       speed,
     })
 
@@ -50,7 +50,7 @@ router.post('/synthesize', async (req: Request, res: Response) => {
   }
 })
 
-// POST /api/voice/transcribe - Convert speech to text (using Cartesia Ink)
+// POST /api/voice/transcribe - Convert speech to text
 router.post('/transcribe', async (req: Request, res: Response) => {
   console.log('[VOICE] /transcribe endpoint called')
   try {
@@ -68,13 +68,13 @@ router.post('/transcribe', async (req: Request, res: Response) => {
       return
     }
 
-    if (!isCartesiaConfigured()) {
-      console.log('[VOICE] Error: Cartesia not configured')
-      res.status(503).json({ error: 'Cartesia STT not configured' })
+    if (!isOpenAIConfigured()) {
+      console.log('[VOICE] Error: OpenAI not configured')
+      res.status(503).json({ error: 'OpenAI Whisper not configured' })
       return
     }
 
-    const text = await cartesiaSTT(audio, mime_type || 'audio/webm')
+    const text = await speechToText(audio, mime_type || 'audio/webm')
     console.log('[VOICE] Transcription successful:', text)
 
     res.json({
@@ -116,12 +116,12 @@ router.post('/respond', async (req: Request, res: Response) => {
     const response = await getInterviewerResponse(transcript, current_question || '', user_code || '')
     console.log('[VOICE] AI response:', response.slice(0, 100) + (response.length > 100 ? '...' : ''))
 
-    // Optionally synthesize to audio using Cartesia
+    // Optionally synthesize to audio
     let audio: string | undefined
-    if (include_audio && isCartesiaConfigured()) {
+    if (include_audio && isOpenAIConfigured()) {
       try {
-        console.log('[VOICE] Generating TTS audio with Cartesia...')
-        audio = await cartesiaTTS(response)
+        console.log('[VOICE] Generating TTS audio...')
+        audio = await textToSpeech(response)
         console.log('[VOICE] TTS audio generated, length:', audio?.length || 0)
       } catch (error) {
         console.error('[VOICE] TTS failed:', error)
@@ -160,9 +160,9 @@ router.post('/introduce', async (req: Request, res: Response) => {
     const introduction = await getInterviewerResponse([], current_question, '')
 
     let audio: string | undefined
-    if (include_audio && isCartesiaConfigured()) {
+    if (include_audio && isOpenAIConfigured()) {
       try {
-        audio = await cartesiaTTS(introduction)
+        audio = await textToSpeech(introduction)
       } catch (error) {
         console.error('TTS failed:', error)
       }
@@ -200,9 +200,9 @@ router.post('/hint', async (req: Request, res: Response) => {
     const hint = await generateHint(current_question, user_code || '', transcript || [])
 
     let audio: string | undefined
-    if (include_audio && isCartesiaConfigured()) {
+    if (include_audio && isOpenAIConfigured()) {
       try {
-        audio = await cartesiaTTS(hint)
+        audio = await textToSpeech(hint)
       } catch (error) {
         console.error('TTS failed:', error)
       }
@@ -251,16 +251,16 @@ router.post('/analyze', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/voice/voices - Get available TTS voices (Cartesia)
+// GET /api/voice/voices - Get available TTS voices
 router.get('/voices', (_req: Request, res: Response) => {
-  const voices = getCartesiaVoices()
+  const voices = getAvailableVoices()
   res.json({ voices })
 })
 
 // GET /api/voice/status - Check voice service status
 router.get('/status', (_req: Request, res: Response) => {
   const llmConfigured = !!process.env.OPENROUTER_API_KEY
-  const cartesiaConfigured = isCartesiaConfigured()
+  const openaiConfigured = isOpenAIConfigured()
 
   res.json({
     llm: {
@@ -269,14 +269,14 @@ router.get('/status', (_req: Request, res: Response) => {
       model: 'anthropic/claude-opus-4',
     },
     tts: {
-      available: cartesiaConfigured,
-      provider: 'cartesia',
-      model: 'sonic-3',
+      available: openaiConfigured,
+      provider: 'openai',
+      model: 'tts-1',
     },
     stt: {
-      available: cartesiaConfigured,
-      provider: 'cartesia',
-      model: 'ink-whisper',
+      available: openaiConfigured,
+      provider: 'openai',
+      model: 'whisper-1',
     },
     websocket: {
       available: true,

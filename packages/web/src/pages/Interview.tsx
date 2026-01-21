@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import InterviewLayout from '@/components/interview/InterviewLayout'
 import QuestionPanel from '@/components/interview/QuestionPanel'
@@ -7,45 +7,69 @@ import TestCasesPanel, { type TestResult } from '@/components/interview/TestCase
 import InterviewTimer from '@/components/interview/InterviewTimer'
 import FloatingInterviewer from '@/components/interview/FloatingInterviewer'
 import { useVoiceInteraction } from '@/hooks/useVoiceInteraction'
-import type { QuestionData, StarterCode, TranscriptEntry } from '@/types'
+import { useInterviewStore } from '@/store/interviewStore'
+import type { QuestionData, TranscriptEntry } from '@/types'
 import type { SupportedLanguage } from '@/hooks/useCodeEditor'
 import { api, type Difficulty } from '@/lib/api'
 
-// Map language to starter code key
-type StarterCodeLanguage = keyof StarterCode
+type StarterCodeLanguage = keyof QuestionData['starter_code']
 
 export default function Interview() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [code, setCode] = useState<string>('')
-  const [language, setLanguage] = useState<SupportedLanguage>('python')
+
+  // Zustand store
+  const {
+    interviewId,
+    status: _interviewStatus,
+    question,
+    code,
+    language,
+    runCount,
+    timeSpentSeconds: _timeSpentSeconds,
+    startInterview,
+    setCode,
+    setLanguage,
+    incrementRunCount,
+    addTranscriptEntry,
+    submitInterview,
+    endInterview,
+    updateTimeSpent,
+    setError: _setError,
+    resetInterview: _resetInterview,
+  } = useInterviewStore()
+
+  // Local UI state
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
-  const [question, setQuestion] = useState<QuestionData | null>(null)
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(true)
   const [questionError, setQuestionError] = useState<string | null>(null)
-  const [editorKey, setEditorKey] = useState(0) // Force re-render when question changes
-  const [_interviewTranscript, setInterviewTranscript] = useState<TranscriptEntry[]>([])
-  const [_lastInterviewerMessage, setLastInterviewerMessage] = useState<string>('')
+  const [editorKey, setEditorKey] = useState(0)
   const [hasIntroduced, setHasIntroduced] = useState(false)
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [cachedIntro, setCachedIntro] = useState<{ text: string; audio?: string } | null>(null)
   const [isPreloading, setIsPreloading] = useState(false)
+  const [localQuestion, setLocalQuestion] = useState<QuestionData | null>(null)
+
+  // Time tracking interval
+  const timeIntervalRef = useRef<number | null>(null)
 
   // Get topic and difficulty from URL params
   const topicSlug = searchParams.get('topic') || 'arrays'
   const difficulty = (searchParams.get('difficulty') as Difficulty) || 'medium'
+  const existingInterviewId = searchParams.get('id')
 
-  // Get interview ID from URL or generate a temporary one
-  const interviewId = useMemo(() => {
-    return searchParams.get('id') || `temp-${Date.now()}`
-  }, [searchParams])
+  // Get topic ID from URL or use a placeholder
+  const topicId = searchParams.get('topicId') || '00000000-0000-0000-0000-000000000000'
+
+  // Use question from store or local state
+  const currentQuestion = question || localQuestion
 
   // Format question for voice context
   const questionContext = useMemo(() => {
-    if (!question) return ''
-    return `${question.title}\n\n${question.description}\n\nConstraints:\n${question.constraints.join('\n')}`
-  }, [question])
+    if (!currentQuestion) return ''
+    return `${currentQuestion.title}\n\n${currentQuestion.description}\n\nConstraints:\n${currentQuestion.constraints.join('\n')}`
+  }, [currentQuestion])
 
   // Voice interaction hook
   const {
@@ -59,45 +83,79 @@ export default function Interview() {
     requestHint: _requestHint,
     requestIntroduction,
     playCachedIntroduction,
-    // Always-listening mode
     isAlwaysListening,
     isSpeechDetected,
     enableAlwaysListening,
     disableAlwaysListening,
   } = useVoiceInteraction({
-    interviewId,
+    interviewId: interviewId || `temp-${Date.now()}`,
     currentQuestion: questionContext,
     userCode: code,
-    onTranscriptUpdate: setInterviewTranscript,
-    onInterviewerResponse: setLastInterviewerMessage,
+    onTranscriptUpdate: (transcript: TranscriptEntry[]) => {
+      // Add new transcript entries to store
+      const lastEntry = transcript[transcript.length - 1]
+      if (lastEntry) {
+        addTranscriptEntry(lastEntry)
+      }
+    },
+    onInterviewerResponse: () => {},
   })
 
-  // Start interview with cached intro (plays immediately)
-  const handleStartInterview = useCallback(() => {
+  // Start time tracking when interview starts
+  useEffect(() => {
+    if (interviewStarted && !timeIntervalRef.current) {
+      timeIntervalRef.current = window.setInterval(() => {
+        updateTimeSpent()
+      }, 1000)
+    }
+
+    return () => {
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current)
+        timeIntervalRef.current = null
+      }
+    }
+  }, [interviewStarted, updateTimeSpent])
+
+  // Handle starting the interview
+  const handleStartInterview = useCallback(async () => {
+    if (!localQuestion) return
+
     setInterviewStarted(true)
     setHasIntroduced(true)
 
+    // Create interview in backend
+    const newInterviewId = await startInterview({
+      topicId,
+      topicSlug,
+      question: localQuestion,
+      language: 'python',
+    })
+
+    if (newInterviewId) {
+      // Update URL with interview ID
+      const newParams = new URLSearchParams(searchParams)
+      newParams.set('id', newInterviewId)
+      navigate(`/interview?${newParams.toString()}`, { replace: true })
+    }
+
     // Play cached intro immediately if available
     if (cachedIntro) {
-      // Small delay to let the UI render first
       setTimeout(() => {
         playCachedIntroduction(cachedIntro)
       }, 100)
     } else {
-      // Fallback to fetching if not cached
       setTimeout(() => {
         requestIntroduction()
       }, 100)
     }
-  }, [cachedIntro, playCachedIntroduction, requestIntroduction])
+  }, [localQuestion, topicId, topicSlug, startInterview, searchParams, navigate, cachedIntro, playCachedIntroduction, requestIntroduction])
 
   // Pre-cache introduction when question is loaded
   useEffect(() => {
-    if (question && questionContext && !cachedIntro && !isPreloading) {
+    if (currentQuestion && questionContext && !cachedIntro && !isPreloading) {
       setIsPreloading(true)
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-
-      fetch(`${API_URL}/api/voice/introduce`, {
+      fetch(`/api/voice/introduce`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,16 +177,27 @@ export default function Interview() {
           setIsPreloading(false)
         })
     }
-  }, [question, questionContext, cachedIntro, isPreloading])
+  }, [currentQuestion, questionContext, cachedIntro, isPreloading])
 
-  // Generate question on mount
+  // Generate question on mount (or load existing interview)
   useEffect(() => {
-    async function generateQuestion() {
+    async function loadOrGenerateQuestion() {
       setIsLoadingQuestion(true)
       setQuestionError(null)
 
       try {
-        // Convert slug to readable topic name (e.g., "two-pointers" -> "Two Pointers")
+        // If we have an existing interview ID, try to load it
+        if (existingInterviewId) {
+          const { interview } = await api.interviews.get(existingInterviewId)
+          setLocalQuestion(interview.question_data)
+          setCode(interview.final_code || interview.question_data.starter_code.python || '')
+          setEditorKey((k) => k + 1)
+          setInterviewStarted(true)
+          setHasIntroduced(true)
+          return
+        }
+
+        // Generate a new question
         const topicName = topicSlug
           .split('-')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -137,16 +206,19 @@ export default function Interview() {
         const { question: generatedQuestion } = await api.questions.generate({
           topic: topicName,
           difficulty,
+          topicId,
         })
-        setQuestion(generatedQuestion)
-        // Set initial code from starter code (default to python)
+
+        setLocalQuestion(generatedQuestion)
+
+        // Set initial code from starter code
         if (generatedQuestion.starter_code) {
           const starterCode = generatedQuestion.starter_code.python
           if (starterCode) {
             setCode(starterCode)
           }
         }
-        setEditorKey((k) => k + 1) // Force editor re-render with new code
+        setEditorKey((k) => k + 1)
       } catch (error) {
         console.error('Failed to generate question:', error)
         setQuestionError(error instanceof Error ? error.message : 'Failed to generate question')
@@ -155,33 +227,49 @@ export default function Interview() {
       }
     }
 
-    generateQuestion()
-  }, [topicSlug, difficulty])
+    loadOrGenerateQuestion()
+
+    // Cleanup on unmount
+    return () => {
+      // Don't reset if navigating to evaluation
+    }
+  }, [topicSlug, difficulty, existingInterviewId, topicId, setCode])
 
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode)
-  }, [])
+  }, [setCode])
 
   const handleLanguageChange = useCallback(
     (newLanguage: SupportedLanguage) => {
       setLanguage(newLanguage)
       // Update code to starter code for new language
-      if (question?.starter_code) {
-        const starterCode = question.starter_code[newLanguage as StarterCodeLanguage]
+      if (currentQuestion?.starter_code) {
+        const starterCode = currentQuestion.starter_code[newLanguage as StarterCodeLanguage]
         if (starterCode) {
           setCode(starterCode)
-          setEditorKey((k) => k + 1) // Force editor re-render
+          setEditorKey((k) => k + 1)
         }
       }
     },
-    [question],
+    [currentQuestion, setLanguage, setCode]
   )
 
   const handleRun = useCallback(async () => {
-    if (!question) return
+    if (!currentQuestion) return
 
     setIsRunning(true)
     setTestResults([])
+
+    // Increment run count in store
+    incrementRunCount()
+
+    // Sync run count to backend
+    if (interviewId && !interviewId.startsWith('temp-')) {
+      api.interviews.update(interviewId, {
+        code,
+        increment_run_count: true,
+      }).catch(console.error)
+    }
 
     try {
       const response = await fetch('/api/execute', {
@@ -190,8 +278,9 @@ export default function Interview() {
         body: JSON.stringify({
           code,
           language,
-          test_cases: question.visible_test_cases,
+          test_cases: currentQuestion.visible_test_cases,
           execution_type: 'run',
+          interview_id: interviewId,
         }),
       })
 
@@ -207,19 +296,18 @@ export default function Interview() {
             error?: string
             test_case_index: number
           }) => ({
-            testCase: question.visible_test_cases[result.test_case_index],
+            testCase: currentQuestion.visible_test_cases[result.test_case_index],
             passed: result.status === 'Accepted',
             actualOutput: result.actual_output,
             error: result.error,
             executionTime: result.execution_time_ms,
-          }),
+          })
         )
         setTestResults(results)
       }
     } catch (error) {
       console.error('Execution failed:', error)
-      // Create mock failed results
-      const results: TestResult[] = question.visible_test_cases.map((tc) => ({
+      const results: TestResult[] = currentQuestion.visible_test_cases.map((tc) => ({
         testCase: tc,
         passed: false,
         error: error instanceof Error ? error.message : 'Failed to execute code',
@@ -228,16 +316,16 @@ export default function Interview() {
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, question])
+  }, [code, language, currentQuestion, incrementRunCount, interviewId])
 
   const handleSubmit = useCallback(async () => {
-    if (!question) return
+    if (!currentQuestion) return
 
     setIsRunning(true)
 
     try {
       // Run against both visible and hidden test cases
-      const allTestCases = [...question.visible_test_cases, ...question.hidden_test_cases]
+      const allTestCases = [...currentQuestion.visible_test_cases, ...currentQuestion.hidden_test_cases]
 
       const response = await fetch('/api/execute', {
         method: 'POST',
@@ -247,14 +335,19 @@ export default function Interview() {
           language,
           test_cases: allTestCases,
           execution_type: 'submit',
+          interview_id: interviewId,
         }),
       })
 
       const data = await response.json()
+      const allPassed = data.success && data.summary.all_passed
 
-      if (data.success && data.summary.all_passed) {
+      // Submit interview to backend
+      await submitInterview(allPassed)
+
+      if (allPassed) {
         // Navigate to evaluation page on success
-        navigate('/evaluation')
+        navigate(`/evaluation${interviewId ? `?interviewId=${interviewId}` : ''}`)
       } else {
         // Show results
         const results: TestResult[] = data.results.map(
@@ -271,7 +364,7 @@ export default function Interview() {
             actualOutput: result.actual_output,
             error: result.error,
             executionTime: result.execution_time_ms,
-          }),
+          })
         )
         setTestResults(results)
       }
@@ -280,18 +373,22 @@ export default function Interview() {
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, question, navigate])
+  }, [code, language, currentQuestion, interviewId, submitInterview, navigate])
 
   const handleTimerComplete = useCallback(() => {
-    // Auto-submit when time runs out
-    handleSubmit()
-  }, [handleSubmit])
+    // End interview due to timeout
+    endInterview('timeout').then(() => {
+      navigate(`/evaluation${interviewId ? `?interviewId=${interviewId}` : ''}`)
+    })
+  }, [endInterview, interviewId, navigate])
 
   const handleGiveUp = useCallback(() => {
     if (confirm('Are you sure you want to give up? Your progress will be saved.')) {
-      navigate('/evaluation')
+      endInterview('give_up').then(() => {
+        navigate(`/evaluation${interviewId ? `?interviewId=${interviewId}` : ''}`)
+      })
     }
-  }, [navigate])
+  }, [endInterview, interviewId, navigate])
 
   // Loading state
   if (isLoadingQuestion) {
@@ -307,7 +404,7 @@ export default function Interview() {
   }
 
   // Error state
-  if (questionError || !question) {
+  if (questionError || !currentQuestion) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
@@ -353,7 +450,7 @@ export default function Interview() {
               </span>
               <span className="text-gray-500 text-sm">{topicSlug.replace(/-/g, ' ')}</span>
             </div>
-            <h2 className="text-white font-semibold">{question.title}</h2>
+            <h2 className="text-white font-semibold">{currentQuestion.title}</h2>
           </div>
 
           {/* AI Interviewer ready indicator */}
@@ -415,7 +512,11 @@ export default function Interview() {
                 YeetCoder
               </h1>
               <span className="text-gray-400">|</span>
-              <span className="text-gray-300">{question.title}</span>
+              <span className="text-gray-300">{currentQuestion.title}</span>
+              {/* Run count badge */}
+              <span className="px-2 py-0.5 text-xs bg-gray-700 text-gray-400 rounded">
+                Runs: {runCount}
+              </span>
             </div>
 
             <div className="flex items-center gap-4">
@@ -429,19 +530,19 @@ export default function Interview() {
             </div>
           </div>
         }
-        leftPanel={<QuestionPanel question={question} />}
+        leftPanel={<QuestionPanel question={currentQuestion} />}
         rightTopPanel={
           <CodeEditor
             key={editorKey}
             initialCode={code}
-            initialLanguage={language}
+            initialLanguage={language as SupportedLanguage}
             onChange={handleCodeChange}
             onLanguageChange={handleLanguageChange}
           />
         }
         rightBottomPanel={
           <TestCasesPanel
-            testCases={question.visible_test_cases}
+            testCases={currentQuestion.visible_test_cases}
             results={testResults}
             isRunning={isRunning}
             onRun={handleRun}
@@ -456,7 +557,7 @@ export default function Interview() {
         transcript={currentTranscript}
         onStartListening={startListening}
         onStopListening={stopListening}
-        hasIntroduced={hasIntroduced || !question}
+        hasIntroduced={hasIntroduced || !currentQuestion}
         isAlwaysListening={isAlwaysListening}
         isSpeechDetected={isSpeechDetected}
         onEnableAlwaysListening={enableAlwaysListening}

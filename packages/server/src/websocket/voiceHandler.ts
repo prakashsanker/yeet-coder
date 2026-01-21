@@ -1,14 +1,10 @@
 import type { InterviewWebSocket, WebSocketMessage } from './index'
 import { sendMessage } from './index'
-import { getInterviewerResponse, shouldRespond } from '../services/interviewer'
-import {
-  textToSpeech,
-  isConfigured as isCartesiaConfigured,
-  StreamingSTTSession,
-} from '../services/cartesia'
+import { getInterviewerResponse } from '../services/interviewer'
+import { textToSpeech, speechToText, isConfigured as isOpenAIConfigured } from '../services/openai-voice'
 
 export interface VoiceSession {
-  sttSession: StreamingSTTSession | null
+  audioChunks: string[] // base64 audio chunks
   isRecording: boolean
   interviewContext: InterviewContext
   cleanup: () => void
@@ -33,7 +29,7 @@ export async function handleVoiceMessage(
 ): Promise<void> {
   switch (message.type) {
     case 'voice_start':
-      await startVoiceSession(ws, message.sample_rate)
+      await startVoiceSession(ws)
       break
 
     case 'voice_stop':
@@ -51,59 +47,15 @@ export async function handleVoiceMessage(
   }
 }
 
-async function startVoiceSession(ws: InterviewWebSocket, sampleRate?: number): Promise<void> {
+async function startVoiceSession(ws: InterviewWebSocket): Promise<void> {
   if (!ws.interviewId) {
     sendMessage(ws, { type: 'error', message: 'Must join interview first' })
     return
   }
 
-  // Check if Cartesia is configured
-  if (!isCartesiaConfigured()) {
-    sendMessage(ws, { type: 'error', message: 'Cartesia not configured - voice features unavailable' })
-    return
-  }
-
-  const actualSampleRate = sampleRate || 16000
-  console.log('[VOICE] Starting voice session with sample rate:', actualSampleRate)
-
-  // Create streaming STT session with callbacks
-  const sttSession = new StreamingSTTSession(
-    {
-      onTranscript: (text, isFinal) => {
-        console.log('[VOICE] Transcript:', isFinal ? '(final)' : '(partial)', text.slice(0, 50))
-        // We don't send partial transcripts to client per user request
-        // Only final transcript is used when session ends
-      },
-      onError: (error) => {
-        console.error('[VOICE] STT error:', error)
-        sendMessage(ws, { type: 'error', message: error.message })
-      },
-      onDone: async (finalText) => {
-        console.log('[VOICE] STT done, final text:', finalText)
-        if (finalText.trim()) {
-          // Send the final transcript to client
-          sendMessage(ws, {
-            type: 'transcript',
-            text: finalText,
-            is_final: true,
-          })
-          // Generate AI response
-          await generateAndSendResponse(ws, finalText)
-        } else {
-          console.log('[VOICE] No speech detected, skipping response')
-        }
-        // Reset for next utterance (check voiceSession exists first)
-        if (ws.voiceSession) {
-          ws.voiceSession.isRecording = false
-        }
-      },
-    },
-    { sampleRate: actualSampleRate }
-  )
-
   // Initialize voice session
   ws.voiceSession = {
-    sttSession,
+    audioChunks: [],
     isRecording: true,
     interviewContext: {
       interviewId: ws.interviewId,
@@ -112,41 +64,64 @@ async function startVoiceSession(ws: InterviewWebSocket, sampleRate?: number): P
       userCode: '',
     },
     cleanup: () => {
-      sttSession.close()
       ws.voiceSession = undefined
     },
   }
 
-  // Connect to Cartesia STT
-  try {
-    await sttSession.connect()
-    console.log('[VOICE] Streaming STT session connected')
-    sendMessage(ws, { type: 'voice_ready' })
-  } catch (error) {
-    console.error('[VOICE] Failed to connect STT session:', error)
-    sendMessage(ws, { type: 'error', message: 'Failed to connect voice service' })
-    ws.voiceSession = undefined
+  // Check if OpenAI is configured
+  if (!isOpenAIConfigured()) {
+    console.warn('OpenAI not configured - voice transcription will be limited')
   }
+
+  sendMessage(ws, { type: 'voice_ready' })
 }
 
 async function stopVoiceSession(ws: InterviewWebSocket): Promise<void> {
   if (!ws.voiceSession) return
 
-  console.log('[VOICE] Stopping voice session - signaling done to Cartesia')
   ws.voiceSession.isRecording = false
 
-  // Signal to Cartesia that we're done sending audio
-  // The onDone callback will handle the response
-  if (ws.voiceSession.sttSession) {
-    ws.voiceSession.sttSession.signalDone()
+  // Transcribe collected audio using OpenAI Whisper
+  if (ws.voiceSession.audioChunks.length > 0) {
+    try {
+      // Combine all audio chunks
+      const combinedAudio = ws.voiceSession.audioChunks.join('')
+      ws.voiceSession.audioChunks = [] // Clear buffer
+
+      if (isOpenAIConfigured()) {
+        const transcribedText = await speechToText(combinedAudio, 'audio/webm')
+
+        if (transcribedText.trim()) {
+          // Send transcript to client
+          sendMessage(ws, {
+            type: 'transcript',
+            text: transcribedText,
+            is_final: true,
+          })
+
+          // Generate interviewer response
+          await generateAndSendResponse(ws, transcribedText)
+        } else {
+          sendMessage(ws, { type: 'error', message: 'No speech detected' })
+        }
+      } else {
+        sendMessage(ws, { type: 'error', message: 'Voice transcription not configured' })
+      }
+    } catch (error) {
+      console.error('Transcription failed:', error)
+      sendMessage(ws, {
+        type: 'error',
+        message: 'Failed to transcribe audio',
+      })
+    }
   }
 }
 
 async function processAudioChunk(ws: InterviewWebSocket, base64Audio: string): Promise<void> {
-  if (!ws.voiceSession?.isRecording || !ws.voiceSession.sttSession) return
+  if (!ws.voiceSession?.isRecording) return
 
-  // Stream audio chunk directly to Cartesia
-  ws.voiceSession.sttSession.sendAudioChunkBase64(base64Audio)
+  // Collect audio chunks for batch transcription when recording stops
+  ws.voiceSession.audioChunks.push(base64Audio)
 }
 
 async function processTextInput(ws: InterviewWebSocket, text: string): Promise<void> {
@@ -158,7 +133,7 @@ async function processTextInput(ws: InterviewWebSocket, text: string): Promise<v
   // Initialize voice session if not exists (for text-only mode)
   if (!ws.voiceSession) {
     ws.voiceSession = {
-      sttSession: null, // No STT session for text input
+      audioChunks: [],
       isRecording: false,
       interviewContext: {
         interviewId: ws.interviewId,
@@ -194,31 +169,12 @@ async function generateAndSendResponse(ws: InterviewWebSocket, userText: string)
   })
 
   try {
-    // First, check if the interviewer should respond at all
-    const decision = await shouldRespond(
-      ws.voiceSession.interviewContext.transcript,
-      userText
-    )
-
-    if (decision === 'DONT_RESPOND') {
-      console.log('[VOICE] Decision: DONT_RESPOND - letting candidate continue')
-      // Tell client to continue listening without a response
-      sendMessage(ws, {
-        type: 'continue_listening',
-      })
-      return
-    }
-
     // Get AI interviewer response
-    console.log('[VOICE] Getting AI response for user input:', userText)
     const response = await getInterviewerResponse(
       ws.voiceSession.interviewContext.transcript,
       ws.voiceSession.interviewContext.currentQuestion,
       ws.voiceSession.interviewContext.userCode
     )
-    console.log('[VOICE] ====== AI RESPONSE ======')
-    console.log('[VOICE]', response)
-    console.log('[VOICE] ============================')
 
     // Add interviewer response to transcript
     ws.voiceSession.interviewContext.transcript.push({
@@ -227,15 +183,13 @@ async function generateAndSendResponse(ws: InterviewWebSocket, userText: string)
       text: response,
     })
 
-    // Try to synthesize speech using Cartesia TTS
+    // Try to synthesize speech using OpenAI TTS
     let audioBase64: string | undefined
-    if (isCartesiaConfigured()) {
+    if (isOpenAIConfigured()) {
       try {
-        console.log('[VOICE] Generating TTS audio with Cartesia...')
         audioBase64 = await textToSpeech(response)
-        console.log('[VOICE] TTS audio generated')
       } catch (error) {
-        console.error('[VOICE] TTS failed, sending text only:', error)
+        console.error('TTS failed, sending text only:', error)
       }
     }
 
@@ -246,7 +200,7 @@ async function generateAndSendResponse(ws: InterviewWebSocket, userText: string)
       audio: audioBase64,
     })
   } catch (error) {
-    console.error('[VOICE] Failed to generate interviewer response:', error)
+    console.error('Failed to generate interviewer response:', error)
     sendMessage(ws, {
       type: 'error',
       message: 'Failed to generate response',
