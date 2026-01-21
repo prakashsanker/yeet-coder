@@ -2,6 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Backend port - can be overridden with VITE_BACKEND_PORT env var
+const backendPort = process.env.VITE_BACKEND_PORT || '3001'
+const backendUrl = `http://localhost:${backendPort}`
+const backendWsUrl = `ws://localhost:${backendPort}`
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,11 +18,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: backendUrl,
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3001',
+        target: backendWsUrl,
         ws: true,
       },
     },
