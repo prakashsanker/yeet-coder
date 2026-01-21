@@ -71,6 +71,7 @@ async function main() {
     console.log(`Server running on http://localhost:${port}`)
     console.log(`WebSocket server running on ws://localhost:${port}/ws/interview`)
     console.log(`GROQ_API_KEY: ${process.env.GROQ_API_KEY ? 'Set (' + process.env.GROQ_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
+    console.log(`CARTESIA_API_KEY: ${process.env.CARTESIA_API_KEY ? 'Set (' + process.env.CARTESIA_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
   })
 }
 

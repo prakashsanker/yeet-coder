@@ -30,6 +30,7 @@ export default function Interview() {
   const [hasIntroduced, setHasIntroduced] = useState(false)
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [cachedIntro, setCachedIntro] = useState<{ text: string; audio?: string } | null>(null)
+  const [isPreloading, setIsPreloading] = useState(false)
 
   // Get topic and difficulty from URL params
   const topicSlug = searchParams.get('topic') || 'arrays'
@@ -90,16 +91,35 @@ export default function Interview() {
     }
   }, [cachedIntro, playCachedIntroduction, requestIntroduction])
 
-  // Static introduction text - no API call needed for instant readiness
-  const STATIC_INTRO_TEXT = `Hi! I'm your AI interviewer today. I'll be here to help guide you through this coding challenge. Take a moment to read through the problem, and when you're ready, feel free to start thinking out loud about your approach. I'm here to help if you get stuck or want to discuss your ideas. Good luck!`
-
-  // Set static intro immediately when question is loaded
+  // Pre-cache introduction when question is loaded
   useEffect(() => {
-    if (question && !cachedIntro) {
-      setCachedIntro({ text: STATIC_INTRO_TEXT })
-      console.log('[INTRO] Static introduction ready')
+    if (question && questionContext && !cachedIntro && !isPreloading) {
+      setIsPreloading(true)
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+      fetch(`${API_URL}/api/voice/introduce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_question: questionContext,
+          include_audio: true,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setCachedIntro({ text: data.text, audio: data.audio })
+            console.log('[PRELOAD] Introduction cached successfully')
+          }
+        })
+        .catch((err) => {
+          console.error('[PRELOAD] Failed to cache introduction:', err)
+        })
+        .finally(() => {
+          setIsPreloading(false)
+        })
     }
-  }, [question, cachedIntro])
+  }, [question, questionContext, cachedIntro, isPreloading])
 
   // Generate question on mount
   useEffect(() => {
@@ -345,10 +365,10 @@ export default function Interview() {
           {/* Start button */}
           <button
             onClick={handleStartInterview}
-            disabled={!cachedIntro}
+            disabled={!cachedIntro && isPreloading}
             className="px-8 py-4 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white text-lg font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            Start Interview
+            {cachedIntro ? 'Start Interview' : 'Preparing...'}
           </button>
 
           {/* Tips */}
