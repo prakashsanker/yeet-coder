@@ -7,6 +7,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY
 export type OpenRouterModel =
   | 'anthropic/claude-opus-4'
   | 'anthropic/claude-sonnet-4'
+  | 'anthropic/claude-haiku-4.5'  // Fast, capable model for real-time conversations
   | 'openai/gpt-4o'
   | 'openai/gpt-4o-mini'
   | 'google/gemini-2.0-flash-exp:free'
@@ -41,7 +42,7 @@ export interface LLMOptions {
   maxTokens?: number
 }
 
-const DEFAULT_MODEL: LLMModel = 'llama-3.1-8b-instant'
+const DEFAULT_MODEL: LLMModel = 'anthropic/claude-haiku-4.5'
 
 function getOpenRouterClient(): OpenAI {
   if (!OPENROUTER_API_KEY) {

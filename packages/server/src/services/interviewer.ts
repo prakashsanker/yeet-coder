@@ -6,6 +6,28 @@ interface TranscriptEntry {
   text: string
 }
 
+export type ResponseDecision = 'RESPOND' | 'DONT_RESPOND'
+
+const SHOULD_RESPOND_PROMPT = `You are analyzing a coding interview conversation. The candidate just said something and paused.
+Decide if the interviewer should respond now, or stay silent and let the candidate continue.
+
+RESPOND ONLY when:
+- The candidate asks a direct question (contains "?", "what", "how", "why", "can you", "could you", "is it", "should I", etc.)
+- The candidate explicitly requests help or clarification
+
+DONT_RESPOND for everything else, including:
+- Thinking out loud or explaining their approach
+- Saying they're done or finished (wait for them to ask for feedback)
+- Making statements or observations
+- Pausing while working through the problem
+- Self-talk or mumbling while problem-solving
+- Incomplete or trailing off statements
+- Errors or mistakes (let them discover it themselves)
+
+Be strict: if there's no clear question mark or question word, default to DONT_RESPOND.
+
+Output ONLY "RESPOND" or "DONT_RESPOND" with no other text.`
+
 const INTERVIEWER_SYSTEM_PROMPT = `You are an experienced technical interviewer at a top tech company conducting a coding interview. Your role is to:
 
 1. Be professional, encouraging, and supportive while maintaining interview standards
@@ -27,13 +49,71 @@ Remember: You're having a verbal conversation. Keep it natural and avoid overly 
 
 const GREETING_PROMPT = `Generate a brief, warm greeting to start the coding interview. Mention you'll present a problem and encourage them to think out loud. Keep it to 2-3 sentences.`
 
+/**
+ * Determine if the interviewer should respond to the user's latest statement.
+ * Uses a fast LLM call to decide based on conversational context.
+ */
+export async function shouldRespond(
+  transcript: TranscriptEntry[],
+  latestUserText: string
+): Promise<ResponseDecision> {
+  // Always respond if this is the first interaction
+  if (transcript.length <= 1) {
+    console.log('[SHOULD_RESPOND] First interaction, responding')
+    return 'RESPOND'
+  }
+
+  // Build recent context (last 4 exchanges max for speed)
+  const recentContext = transcript
+    .slice(-4)
+    .map((t) => `${t.speaker === 'user' ? 'Candidate' : 'Interviewer'}: ${t.text}`)
+    .join('\n')
+
+  const prompt = `Recent conversation:
+${recentContext}
+
+The candidate just said: "${latestUserText}"
+
+Should the interviewer respond now?`
+
+  try {
+    console.log('[SHOULD_RESPOND] Checking if response needed for:', latestUserText.slice(0, 50))
+    const startTime = Date.now()
+
+    const response = await generateText(
+      [
+        { role: 'system', content: SHOULD_RESPOND_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+      {
+        maxTokens: 10, // Only need one word
+        temperature: 0.1, // Low temperature for consistent decisions
+      }
+    )
+
+    const elapsed = Date.now() - startTime
+    const decision = response.trim().toUpperCase().includes('DONT_RESPOND') ? 'DONT_RESPOND' : 'RESPOND'
+    console.log(`[SHOULD_RESPOND] Decision: ${decision} (${elapsed}ms)`)
+
+    return decision
+  } catch (error) {
+    console.error('[SHOULD_RESPOND] Error, defaulting to RESPOND:', error)
+    // Default to responding on error
+    return 'RESPOND'
+  }
+}
+
 export async function getInterviewerResponse(
   transcript: TranscriptEntry[],
   currentQuestion: string,
   userCode: string
 ): Promise<string> {
+  console.log('[INTERVIEWER] ====== GENERATING RESPONSE ======')
+  console.log('[INTERVIEWER] Transcript entries:', transcript.length)
+
   // If no transcript, generate initial greeting
   if (transcript.length === 0) {
+    console.log('[INTERVIEWER] No transcript, generating greeting')
     return generateGreeting()
   }
 
@@ -50,15 +130,27 @@ export async function getInterviewerResponse(
     })),
   ]
 
+  // Log the messages being sent
+  console.log('[INTERVIEWER] Messages to LLM:')
+  messages.forEach((msg, i) => {
+    const preview = msg.content.length > 150 ? msg.content.slice(0, 150) + '...' : msg.content
+    console.log(`[INTERVIEWER]   [${i}] ${msg.role}: ${preview}`)
+  })
+
   try {
+    const startTime = Date.now()
     const response = await generateText(messages, {
       maxTokens: 256,
       temperature: 0.7,
     })
+    const elapsed = Date.now() - startTime
+
+    console.log(`[INTERVIEWER] Response generated in ${elapsed}ms`)
+    console.log('[INTERVIEWER] ================================')
 
     return response
   } catch (error) {
-    console.error('Failed to generate interviewer response:', error)
+    console.error('[INTERVIEWER] Failed to generate response:', error)
     // Fallback responses
     return getFallbackResponse(transcript)
   }

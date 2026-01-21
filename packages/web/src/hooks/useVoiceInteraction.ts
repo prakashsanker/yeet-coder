@@ -24,6 +24,7 @@ type WebSocketMessage =
   | { type: 'transcript'; text: string; is_final: boolean }
   | { type: 'interviewer_response'; text: string; audio?: string }
   | { type: 'voice_ready' }
+  | { type: 'continue_listening' } // Interviewer decided not to respond, keep listening
   | { type: 'error'; message: string }
 
 export function useVoiceInteraction({
@@ -171,6 +172,16 @@ export function useVoiceInteraction({
             } else {
               setVoiceState('idle')
             }
+          }
+          break
+
+        case 'continue_listening':
+          // Interviewer decided not to respond - keep listening for more input
+          console.log('[WS] Interviewer chose not to respond, continuing to listen')
+          if (isListeningRef.current) {
+            startSTTSession()
+          } else {
+            setVoiceState('idle')
           }
           break
 

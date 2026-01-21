@@ -1,6 +1,6 @@
 import type { InterviewWebSocket, WebSocketMessage } from './index'
 import { sendMessage } from './index'
-import { getInterviewerResponse } from '../services/interviewer'
+import { getInterviewerResponse, shouldRespond } from '../services/interviewer'
 import {
   textToSpeech,
   isConfigured as isCartesiaConfigured,
@@ -194,6 +194,21 @@ async function generateAndSendResponse(ws: InterviewWebSocket, userText: string)
   })
 
   try {
+    // First, check if the interviewer should respond at all
+    const decision = await shouldRespond(
+      ws.voiceSession.interviewContext.transcript,
+      userText
+    )
+
+    if (decision === 'DONT_RESPOND') {
+      console.log('[VOICE] Decision: DONT_RESPOND - letting candidate continue')
+      // Tell client to continue listening without a response
+      sendMessage(ws, {
+        type: 'continue_listening',
+      })
+      return
+    }
+
     // Get AI interviewer response
     console.log('[VOICE] Getting AI response for user input:', userText)
     const response = await getInterviewerResponse(
