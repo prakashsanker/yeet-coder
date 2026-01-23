@@ -119,9 +119,10 @@ export default function AppHeader({ showBack, onBack, children, rightContent, hi
                 {showDropdown && (
                   <div className="absolute right-0 mt-2 w-48 bg-lc-bg-layer-2 border border-lc-border rounded-lg shadow-lg py-1 z-50">
                     <button
-                      onClick={() => {
-                        signOut()
+                      onClick={async () => {
+                        await signOut()
                         setShowDropdown(false)
+                        navigate('/')
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-lc-text-secondary hover:bg-lc-bg-layer-3 hover:text-lc-text-primary transition-colors flex items-center gap-2"
                     >
