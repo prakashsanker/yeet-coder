@@ -4,7 +4,7 @@ import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import FloatingInterviewer from '@/components/interview/FloatingInterviewer'
 import AppHeader from '@/components/common/AppHeader'
-import { useVoiceInteraction } from '@/hooks/useVoiceInteraction'
+import { useRealtimeVoice } from '@/hooks/useRealtimeVoice'
 import { api, type InterviewSession, type TranscriptEntry } from '@/lib/api'
 
 export default function SystemDesignInterview() {
@@ -63,7 +63,7 @@ export default function SystemDesignInterview() {
     isSpeechDetected,
     enableAlwaysListening,
     disableAlwaysListening,
-  } = useVoiceInteraction({
+  } = useRealtimeVoice({
     interviewId: interviewIdParam || '',
     currentQuestion: questionContext,
     userCode: notes, // Use notes as context
