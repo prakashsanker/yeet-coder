@@ -7,38 +7,21 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
 
-    console.log('[API] Session check:', {
-      hasSession: !!session,
-      hasAccessToken: !!session?.access_token,
-      expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
-      now: new Date().toISOString(),
-    })
-
     if (session?.access_token) {
       // Check if token is expired or about to expire (within 60 seconds)
       const expiresAt = session.expires_at ? session.expires_at * 1000 : 0
       const now = Date.now()
 
-      console.log('[API] Token expiry check:', { expiresAt, now, isExpired: expiresAt < now + 60000 })
-
       if (expiresAt && expiresAt < now + 60000) {
         // Token expired or expiring soon, try to refresh
-        console.log('[API] Token expired, attempting refresh...')
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
 
-        console.log('[API] Refresh result:', {
-          hasNewSession: !!refreshData?.session,
-          error: refreshError?.message,
-        })
-
         if (refreshError || !refreshData.session) {
-          console.warn('[API] Failed to refresh session:', refreshError)
           // Sign out to force re-login
           await supabase.auth.signOut()
           return {}
         }
 
-        console.log('[API] Using refreshed token')
         return { Authorization: `Bearer ${refreshData.session.access_token}` }
       }
 
@@ -82,7 +65,6 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
     // If we get a 401, the token is invalid - force clear session and redirect
     if (response.status === 401) {
-      console.log('[API] Got 401, clearing session and redirecting to login')
       // Clear all Supabase auth data from localStorage
       const keysToRemove = Object.keys(localStorage).filter(
         (key) => key.startsWith('sb-') && key.includes('-auth-')
