@@ -1,38 +1,15 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { supabase } from '../db/supabase'
-import type { InterviewSession, TranscriptEntry } from '../types'
+import { optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth'
+import type { InterviewSession, TranscriptEntry, Question } from '../types'
 
 const router = Router()
 
 // Validation schemas
+// New schema: uses question_id to reference questions table
 const createInterviewSchema = z.object({
-  topic_id: z.string().uuid(),
-  question_data: z.object({
-    title: z.string(),
-    description: z.string(),
-    examples: z.array(z.object({
-      input: z.string(),
-      output: z.string(),
-      explanation: z.string().optional(),
-    })),
-    constraints: z.array(z.string()),
-    visible_test_cases: z.array(z.object({
-      input: z.string(),
-      expected_output: z.string(),
-    })),
-    hidden_test_cases: z.array(z.object({
-      input: z.string(),
-      expected_output: z.string(),
-    })),
-    starter_code: z.object({
-      python: z.string(),
-      javascript: z.string(),
-      typescript: z.string(),
-      java: z.string(),
-      cpp: z.string(),
-    }),
-  }),
+  question_id: z.string().uuid(),
   language: z.string().default('python'),
   time_limit_seconds: z.number().optional().default(3600),
 })
@@ -40,6 +17,7 @@ const createInterviewSchema = z.object({
 const updateInterviewSchema = z.object({
   code: z.string().optional(),
   language: z.string().optional(),
+  time_spent_seconds: z.number().optional(),
   increment_run_count: z.boolean().optional(),
   transcript_entry: z.object({
     timestamp: z.number(),
@@ -55,7 +33,7 @@ const endInterviewSchema = z.object({
 })
 
 // POST /api/interviews - Start a new interview
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const parseResult = createInterviewSchema.safeParse(req.body)
     if (!parseResult.success) {
@@ -65,17 +43,79 @@ router.post('/', async (req: Request, res: Response) => {
       })
     }
 
-    const { topic_id, question_data, language, time_limit_seconds } = parseResult.data
+    const { question_id, language, time_limit_seconds } = parseResult.data
 
-    // For now, use a demo user ID (in production, this comes from auth middleware)
-    const userId = req.headers['x-user-id'] as string || '00000000-0000-0000-0000-000000000000'
+    // Fetch the question to get topic_id and validate it exists
+    const { data: question, error: questionError } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('id', question_id)
+      .single()
+
+    if (questionError || !question) {
+      console.error('Error fetching question:', questionError)
+      return res.status(404).json({ error: 'Question not found' })
+    }
+
+    const topic_id = question.topic_id
+
+    // Check if user is authenticated
+    const userId = req.user?.id
+
+    // For anonymous users, return a local-only interview (not persisted to DB)
+    if (!userId) {
+      const localInterview = {
+        id: `local-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        user_id: null,
+        topic_id,
+        question_id,
+        question: question as Question,
+        language,
+        time_limit_seconds,
+        status: 'in_progress',
+        run_count: 0,
+        submit_count: 0,
+        transcript: [],
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        final_code: null,
+        time_spent_seconds: null,
+      }
+
+      console.log(`[INTERVIEW] Created local interview ${localInterview.id} for anonymous user`)
+
+      return res.status(201).json({
+        success: true,
+        interview: localInterview as unknown as InterviewSession,
+        isLocal: true,
+      })
+    }
+
+    // Ensure user profile exists (create if missing - handles case where trigger didn't run)
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (!existingProfile) {
+      console.log(`[INTERVIEW] Creating missing profile for user ${userId}`)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({ id: userId })
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError)
+        // Continue anyway - the interview insert will fail with FK error if profile still doesn't exist
+      }
+    }
 
     const { data: interview, error } = await supabase
       .from('interview_sessions')
       .insert({
         user_id: userId,
         topic_id,
-        question_data,
+        question_id,
         language,
         time_limit_seconds,
         status: 'in_progress',
@@ -91,11 +131,17 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to create interview' })
     }
 
-    console.log(`[INTERVIEW] Created new interview ${interview.id} for topic ${topic_id}`)
+    // Return interview with joined question data
+    const interviewWithQuestion = {
+      ...interview,
+      question: question as Question,
+    }
+
+    console.log(`[INTERVIEW] Created new interview ${interview.id} for question ${question_id}`)
 
     return res.status(201).json({
       success: true,
-      interview: interview as InterviewSession,
+      interview: interviewWithQuestion as InterviewSession,
     })
   } catch (err) {
     console.error('Unexpected error creating interview:', err)
@@ -103,16 +149,19 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/interviews - List user's interviews
-router.get('/', async (req: Request, res: Response) => {
+// GET /api/interviews - List user's interviews with question data
+router.get('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.headers['x-user-id'] as string
+    const userId = req.user?.id
     const status = req.query.status as string | undefined
     const limit = parseInt(req.query.limit as string) || 20
 
     let query = supabase
       .from('interview_sessions')
-      .select('*')
+      .select(`
+        *,
+        question:questions(*)
+      `)
       .order('started_at', { ascending: false })
       .limit(limit)
 
@@ -141,14 +190,18 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/interviews/:id - Get interview state
+// GET /api/interviews/:id - Get interview state with question data
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
 
+    // Fetch interview with joined question data
     const { data: interview, error } = await supabase
       .from('interview_sessions')
-      .select('*')
+      .select(`
+        *,
+        question:questions(*)
+      `)
       .eq('id', id)
       .single()
 
@@ -158,6 +211,19 @@ router.get('/:id', async (req: Request, res: Response) => {
       }
       console.error('Error fetching interview:', error)
       return res.status(500).json({ error: 'Failed to fetch interview' })
+    }
+
+    // If interview has question_id but join failed (shouldn't happen), fetch separately
+    if (interview.question_id && !interview.question) {
+      const { data: question } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('id', interview.question_id)
+        .single()
+
+      if (question) {
+        interview.question = question
+      }
     }
 
     return res.json({
@@ -183,7 +249,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       })
     }
 
-    const { code, language, increment_run_count, transcript_entry } = parseResult.data
+    const { code, language, time_spent_seconds, increment_run_count, transcript_entry } = parseResult.data
 
     // First, get the current interview state
     const { data: currentInterview, error: fetchError } = await supabase
@@ -209,6 +275,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     if (language !== undefined) {
       updateData.language = language
+    }
+
+    if (time_spent_seconds !== undefined) {
+      updateData.time_spent_seconds = time_spent_seconds
     }
 
     if (increment_run_count) {

@@ -20,16 +20,44 @@ export interface InterviewSession {
   id: string
   user_id: string
   topic_id: string
+  question_id?: string // New: references questions table
   status: 'in_progress' | 'completed' | 'abandoned'
-  question_data: QuestionData
+  question_data?: QuestionData // Legacy: kept for backward compatibility
   language: string
   final_code?: string
   started_at: string
   ended_at?: string
   time_spent_seconds?: number
+  time_limit_seconds?: number
   run_count: number
   submit_count: number
   transcript: TranscriptEntry[]
+  // Joined data (populated when fetching)
+  question?: Question
+}
+
+export interface Question {
+  id: string
+  title: string
+  slug: string
+  description: string
+  type: 'coding' | 'system_design'
+  difficulty: 'easy' | 'medium' | 'hard'
+  topic_id?: string
+  source?: string
+  source_url?: string
+  leetcode_number?: number
+  examples?: Example[]
+  metadata?: {
+    constraints?: string[]
+    visible_test_cases?: TestCase[]
+    hidden_test_cases?: TestCase[]
+    starter_code?: StarterCode
+  }
+  hints?: string[]
+  solution_explanation?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface StarterCode {
@@ -83,4 +111,35 @@ export interface ExecutionResult {
   execution_time_ms?: number
   memory_kb?: number
   error?: string
+}
+
+export interface Evaluation {
+  id: string
+  interview_id: string
+  test_case_coverage_score?: number
+  thought_process_score?: number
+  clarifying_questions_score?: number
+  edge_case_score?: number
+  time_management_score?: number
+  complexity_analysis_score?: number
+  code_quality_score?: number
+  overall_score?: number
+  verdict?: 'PASS' | 'FAIL'
+  feedback?: EvaluationFeedback
+  solution_code?: string
+  solution_explanation?: SolutionStep[]
+  created_at: string
+}
+
+export interface EvaluationFeedback {
+  strengths: string[]
+  improvements: string[]
+  detailed_notes: string
+}
+
+export interface SolutionStep {
+  line_number: number
+  explanation: string
+  variables: Record<string, unknown>
+  visualization_data?: unknown
 }

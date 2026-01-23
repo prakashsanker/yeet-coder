@@ -53,6 +53,9 @@ export function useVoiceInteraction({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const audioContextRef = useRef<AudioContext | null>(null)
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null)
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const hasPlayedIntroRef = useRef(false)
 
   // Always-listening mode refs
   const streamRef = useRef<MediaStream | null>(null)
@@ -60,6 +63,19 @@ export function useVoiceInteraction({
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const vadAnimationRef = useRef<number | null>(null)
   const isRecordingRef = useRef(false)
+
+  // Refs to track current state values (for stable callback identity)
+  const isAlwaysListeningRef = useRef(isAlwaysListening)
+  const voiceStateRef = useRef(voiceState)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isAlwaysListeningRef.current = isAlwaysListening
+  }, [isAlwaysListening])
+
+  useEffect(() => {
+    voiceStateRef.current = voiceState
+  }, [voiceState])
 
   // Connect to WebSocket
   const connect = useCallback(() => {
@@ -160,6 +176,23 @@ export function useVoiceInteraction({
     [onTranscriptUpdate, onInterviewerResponse]
   )
 
+  // Stop any currently playing audio
+  const stopCurrentAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause()
+      currentAudioRef.current.src = ''
+      currentAudioRef.current = null
+    }
+    if (currentSourceRef.current) {
+      try {
+        currentSourceRef.current.stop()
+      } catch {
+        // Ignore error if already stopped
+      }
+      currentSourceRef.current = null
+    }
+  }, [])
+
   // Play audio from base64
   const playAudio = useCallback(async (base64Audio: string) => {
     if (!base64Audio) {
@@ -167,38 +200,70 @@ export function useVoiceInteraction({
       return
     }
 
+    // Stop any currently playing audio to prevent echoing
+    stopCurrentAudio()
+
     setVoiceState('speaking')
 
     try {
-      // Create audio context if needed
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext()
-      }
+      // Try using HTML Audio element first (more reliable for autoplay)
+      const audioDataUrl = `data:audio/mp3;base64,${base64Audio}`
+      const audio = new Audio(audioDataUrl)
+      currentAudioRef.current = audio
 
-      // Decode base64 to audio buffer
-      const binaryString = atob(base64Audio)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-      }
-
-      const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer)
-
-      // Play the audio
-      const source = audioContextRef.current.createBufferSource()
-      source.buffer = audioBuffer
-      source.connect(audioContextRef.current.destination)
-
-      source.onended = () => {
+      audio.onended = () => {
+        currentAudioRef.current = null
         setVoiceState('idle')
       }
 
-      source.start(0)
+      audio.onerror = async () => {
+        console.log('HTML Audio failed, trying AudioContext...')
+        currentAudioRef.current = null
+        // Fallback to AudioContext
+        try {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new AudioContext()
+          }
+
+          // Resume if suspended
+          if (audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume()
+          }
+
+          // Decode base64 to audio buffer
+          const binaryString = atob(base64Audio)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+
+          const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer)
+
+          const source = audioContextRef.current.createBufferSource()
+          currentSourceRef.current = source
+          source.buffer = audioBuffer
+          source.connect(audioContextRef.current.destination)
+
+          source.onended = () => {
+            currentSourceRef.current = null
+            setVoiceState('idle')
+          }
+
+          source.start(0)
+        } catch (fallbackErr) {
+          console.error('AudioContext fallback also failed:', fallbackErr)
+          setVoiceState('idle')
+        }
+      }
+
+      await audio.play()
+      console.log('[VOICE] Audio playback started successfully')
     } catch (err) {
-      console.error('Failed to play audio:', err)
+      console.error('[VOICE] Failed to play audio:', err)
+      currentAudioRef.current = null
       setVoiceState('idle')
     }
-  }, [])
+  }, [stopCurrentAudio])
 
   // Helper function for REST API fallback
   const sendTextInputRest = useCallback(
@@ -499,7 +564,14 @@ export function useVoiceInteraction({
   // Play a pre-cached introduction immediately
   const playCachedIntroduction = useCallback(
     (cachedIntro: { text: string; audio?: string }) => {
-      console.log('[VOICE] Playing cached introduction')
+      // Guard against multiple calls
+      if (hasPlayedIntroRef.current) {
+        console.log('[VOICE] Intro already played, skipping')
+        return
+      }
+      hasPlayedIntroRef.current = true
+
+      console.log('[VOICE] Playing cached introduction, has audio:', !!cachedIntro.audio)
 
       // Add to transcript
       const introEntry: TranscriptEntry = {
@@ -516,8 +588,10 @@ export function useVoiceInteraction({
 
       // Play audio if available
       if (cachedIntro.audio) {
+        console.log('[VOICE] Starting audio playback, audio length:', cachedIntro.audio.length)
         playAudio(cachedIntro.audio)
       } else {
+        console.log('[VOICE] No audio in cached intro')
         setVoiceState('idle')
       }
     },
@@ -689,13 +763,46 @@ export function useVoiceInteraction({
 
   // Enable always-listening mode
   const enableAlwaysListening = useCallback(async () => {
+    console.log('[VOICE] enableAlwaysListening called, state:', {
+      isAlwaysListening: isAlwaysListeningRef.current,
+      voiceState: voiceStateRef.current
+    })
+
+    // Prevent double-enabling (use ref for current value)
+    if (isAlwaysListeningRef.current) {
+      console.log('[VOICE] Already listening, skipping')
+      return
+    }
+
+    // Don't enable while speaking or processing (use ref for current value)
+    if (voiceStateRef.current === 'speaking' || voiceStateRef.current === 'processing') {
+      console.log('[VOICE] Cannot enable while', voiceStateRef.current)
+      return
+    }
+
     try {
       // Get microphone stream
+      console.log('[VOICE] Requesting microphone access...')
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+      console.log('[VOICE] Microphone access granted')
 
-      // Create audio context and analyser for VAD
-      const audioContext = new AudioContext()
+      // Create or reuse audio context for VAD
+      // (avoid hitting browser limits on AudioContext count)
+      let audioContext = audioContextRef.current
+      if (!audioContext || audioContext.state === 'closed') {
+        console.log('[VOICE] Creating new AudioContext')
+        audioContext = new AudioContext()
+      } else {
+        console.log('[VOICE] Reusing AudioContext, state:', audioContext.state)
+      }
+
+      // Resume if suspended (browsers require user interaction)
+      if (audioContext.state === 'suspended') {
+        console.log('[VOICE] Resuming suspended AudioContext')
+        await audioContext.resume()
+      }
+
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
       analyser.smoothingTimeConstant = 0.8
@@ -708,11 +815,12 @@ export function useVoiceInteraction({
 
       setIsAlwaysListening(true)
       setError(null)
+      console.log('[VOICE] Always-listening enabled successfully')
     } catch (err) {
-      console.error('Failed to enable always-listening:', err)
+      console.error('[VOICE] Failed to enable always-listening:', err)
       setError('Microphone access denied')
     }
-  }, [])
+  }, []) // Empty deps - use refs for current state values
 
   // Disable always-listening mode
   const disableAlwaysListening = useCallback(() => {
@@ -766,16 +874,26 @@ export function useVoiceInteraction({
     connect()
 
     return () => {
+      // Only clean up WebSocket connection here
+      // Always-listening resources are cleaned up by disableAlwaysListening
       if (wsRef.current) {
         wsRef.current.close()
         wsRef.current = null
       }
+    }
+  }, [connect])
+
+  // Cleanup on unmount only (not on reconnect)
+  useEffect(() => {
+    return () => {
+      // Stop any push-to-talk recording
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current.stop()
         if (mediaRecorderRef.current.stream) {
           mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop())
         }
       }
+      // Clean up always-listening resources
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
@@ -789,7 +907,7 @@ export function useVoiceInteraction({
         audioContextRef.current.close()
       }
     }
-  }, [connect])
+  }, []) // Empty deps - only runs on unmount
 
   return {
     voiceState,

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { QuestionData, TranscriptEntry, InterviewSession } from '@/types'
+import { getAuthHeaders } from '@/lib/api'
 
 export type InterviewStatus = 'idle' | 'loading' | 'ready' | 'in_progress' | 'submitting' | 'completed' | 'abandoned'
 
@@ -91,9 +92,10 @@ export const useInterviewStore = create<InterviewStore>()(
           set({ status: 'loading', error: null })
 
           try {
+            const authHeaders = await getAuthHeaders()
             const response = await fetch('/api/interviews', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify({
                 topic_id: topicId,
                 question_data: question,
@@ -102,8 +104,14 @@ export const useInterviewStore = create<InterviewStore>()(
             })
 
             if (!response.ok) {
-              const error = await response.json()
-              throw new Error(error.error || 'Failed to create interview')
+              const errorData = await response.json()
+              console.error('[STORE] Interview creation failed:', {
+                status: response.status,
+                error: errorData.error,
+                details: errorData.details,
+                sentData: { topic_id: topicId, question_data: question, language }
+              })
+              throw new Error(errorData.error || 'Failed to create interview')
             }
 
             const { interview } = await response.json() as { interview: InterviewSession }
@@ -144,7 +152,10 @@ export const useInterviewStore = create<InterviewStore>()(
           set({ status: 'loading', error: null })
 
           try {
-            const response = await fetch(`/api/interviews/${id}`)
+            const authHeaders = await getAuthHeaders()
+            const response = await fetch(`/api/interviews/${id}`, {
+              headers: authHeaders,
+            })
             if (!response.ok) {
               throw new Error('Interview not found')
             }
@@ -199,14 +210,15 @@ export const useInterviewStore = create<InterviewStore>()(
 
         syncToBackend: async () => {
           const { interviewId, code, language } = get()
-          if (!interviewId || interviewId.startsWith('temp-')) {
-            return // Don't sync temp interviews
+          if (!interviewId || interviewId.startsWith('temp-') || interviewId.startsWith('local-')) {
+            return // Don't sync temp/local interviews
           }
 
           try {
+            const authHeaders = await getAuthHeaders()
             await fetch(`/api/interviews/${interviewId}`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify({
                 code,
                 language,
@@ -224,14 +236,22 @@ export const useInterviewStore = create<InterviewStore>()(
 
           // Sync transcript to backend
           const { interviewId } = get()
-          if (interviewId && !interviewId.startsWith('temp-')) {
-            fetch(`/api/interviews/${interviewId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                transcript_entry: entry,
-              }),
-            }).catch(console.error)
+          if (interviewId && !interviewId.startsWith('temp-') && !interviewId.startsWith('local-')) {
+            // Fire-and-forget async call with auth headers
+            (async () => {
+              try {
+                const authHeaders = await getAuthHeaders()
+                await fetch(`/api/interviews/${interviewId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json', ...authHeaders },
+                  body: JSON.stringify({
+                    transcript_entry: entry,
+                  }),
+                })
+              } catch (error) {
+                console.error('[STORE] Failed to sync transcript:', error)
+              }
+            })()
           }
         },
 
@@ -241,10 +261,11 @@ export const useInterviewStore = create<InterviewStore>()(
           set({ status: 'submitting' })
 
           try {
-            if (interviewId && !interviewId.startsWith('temp-')) {
+            if (interviewId && !interviewId.startsWith('temp-') && !interviewId.startsWith('local-')) {
+              const authHeaders = await getAuthHeaders()
               await fetch(`/api/interviews/${interviewId}/submit`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify({
                   final_code: code,
                   time_spent_seconds: timeSpentSeconds,
@@ -270,10 +291,11 @@ export const useInterviewStore = create<InterviewStore>()(
           const { interviewId, code, timeSpentSeconds } = get()
 
           try {
-            if (interviewId && !interviewId.startsWith('temp-')) {
+            if (interviewId && !interviewId.startsWith('temp-') && !interviewId.startsWith('local-')) {
+              const authHeaders = await getAuthHeaders()
               await fetch(`/api/interviews/${interviewId}/end`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify({
                   final_code: code,
                   reason,
