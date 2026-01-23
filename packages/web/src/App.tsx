@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Landing from './pages/Landing'
 import Onboarding from './pages/Onboarding'
 import Interview from './pages/Interview'
+import Evaluation from './pages/Evaluation'
 import { supabase } from './lib/supabase'
 
 function AuthCallback() {
@@ -44,6 +45,7 @@ function App() {
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/interview/:id" element={<Interview />} />
+      <Route path="/evaluation/:id" element={<Evaluation />} />
     </Routes>
   )
 }

@@ -170,10 +170,16 @@ export async function generateJSON<T>(
 
   const elapsed = Date.now() - startTime
   const usage = response.usage
+  const finishReason = response.choices[0]?.finish_reason
   console.log(
     `[LLM] ${provider} JSON response received | model: ${model} | ${elapsed}ms` +
-      (usage ? ` | tokens: ${usage.prompt_tokens} in / ${usage.completion_tokens} out` : '')
+      (usage ? ` | tokens: ${usage.prompt_tokens} in / ${usage.completion_tokens} out` : '') +
+      ` | finish_reason: ${finishReason}`
   )
+
+  if (finishReason === 'length') {
+    console.warn(`[LLM] WARNING: Response was truncated due to max_tokens limit!`)
+  }
 
   const content = response.choices[0]?.message?.content
   if (!content) {

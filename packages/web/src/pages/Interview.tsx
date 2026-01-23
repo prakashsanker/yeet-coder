@@ -85,6 +85,7 @@ export default function Interview() {
   const [interview, setInterview] = useState<InterviewSession | null>(null)
   const [questionData, setQuestionData] = useState<QuestionData | null>(null)
   const [isResumedSession, setIsResumedSession] = useState(false)
+  const [customTestCases, setCustomTestCases] = useState<{ input: string; expected_output: string }[]>([])
 
   // Refs
   const timeIntervalRef = useRef<number | null>(null)
@@ -303,6 +304,20 @@ export default function Interview() {
   const handleRun = useCallback(async () => {
     if (!questionData || !interviewIdParam) return
 
+    // Combine built-in and custom test cases
+    const builtInTestCases = questionData.visible_test_cases || []
+    const allVisibleTestCases = [...builtInTestCases, ...customTestCases]
+
+    // Check if we have test cases to run
+    if (allVisibleTestCases.length === 0) {
+      setTestResults([{
+        testCase: { input: '', expected_output: '' },
+        passed: false,
+        error: 'No test cases available. Add custom test cases to run your code.',
+      }])
+      return
+    }
+
     setIsRunning(true)
     setTestResults([])
 
@@ -323,13 +338,17 @@ export default function Interview() {
         body: JSON.stringify({
           code,
           language,
-          test_cases: questionData.visible_test_cases,
+          test_cases: allVisibleTestCases,
           execution_type: 'run',
           interview_id: interviewIdParam,
         }),
       })
 
       const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Execution failed')
+      }
 
       if (data.success && data.results) {
         const results: TestResult[] = data.results.map(
@@ -341,7 +360,7 @@ export default function Interview() {
             error?: string
             test_case_index: number
           }) => ({
-            testCase: questionData.visible_test_cases[result.test_case_index],
+            testCase: allVisibleTestCases[result.test_case_index],
             passed: result.status === 'Accepted',
             actualOutput: result.actual_output,
             error: result.error,
@@ -352,7 +371,7 @@ export default function Interview() {
       }
     } catch (error) {
       console.error('Execution failed:', error)
-      const results: TestResult[] = questionData.visible_test_cases.map((tc) => ({
+      const results: TestResult[] = allVisibleTestCases.map((tc) => ({
         testCase: tc,
         passed: false,
         error: error instanceof Error ? error.message : 'Failed to execute code',
@@ -361,15 +380,46 @@ export default function Interview() {
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, questionData, incrementRunCount, interviewIdParam])
+  }, [code, language, questionData, incrementRunCount, interviewIdParam, customTestCases])
 
   const handleSubmit = useCallback(async () => {
     if (!questionData || !interviewIdParam) return
 
+    // Combine all test cases (built-in visible, hidden, and custom)
+    const builtInVisible = questionData.visible_test_cases || []
+    const builtInHidden = questionData.hidden_test_cases || []
+    const allTestCases = [...builtInVisible, ...builtInHidden, ...customTestCases]
+
+    // Helper to create evaluation with test data
+    const createEvaluationWithData = async (testResults?: {
+      visible: { passed: number; total: number }
+      hidden: { passed: number; total: number }
+    }) => {
+      try {
+        const { evaluation } = await api.evaluations.create({
+          interview_id: interviewIdParam,
+          test_results: testResults || {
+            visible: { passed: 0, total: builtInVisible.length },
+            hidden: { passed: 0, total: builtInHidden.length },
+          },
+          user_test_cases: customTestCases,
+        })
+        navigate(`/evaluation/${evaluation.id}`)
+      } catch {
+        console.error('Failed to create evaluation')
+        navigate('/')
+      }
+    }
+
     setIsRunning(true)
 
     try {
-      const allTestCases = [...questionData.visible_test_cases, ...questionData.hidden_test_cases]
+      // If no test cases, just submit without execution
+      if (allTestCases.length === 0) {
+        await submitInterview(false) // Submit as not all passed (no tests to verify)
+        await createEvaluationWithData()
+        return
+      }
 
       const response = await fetch('/api/execute', {
         method: 'POST',
@@ -384,14 +434,52 @@ export default function Interview() {
       })
 
       const data = await response.json()
-      const allPassed = data.success && data.summary.all_passed
+
+      // Check if execution was successful
+      if (!response.ok || !data.success) {
+        const errorMessage = data.error || data.message || 'Execution failed'
+        console.error('Submit execution failed:', errorMessage)
+        // Still allow submission even if execution fails
+        await submitInterview(false)
+        setTestResults([{
+          testCase: { input: '', expected_output: '' },
+          passed: false,
+          error: `Execution error: ${errorMessage}. Your solution has been submitted.`,
+        }])
+        await createEvaluationWithData()
+        return
+      }
+
+      // Calculate pass counts for visible and hidden test cases
+      const results = data.results || []
+      let visiblePassed = 0
+      let hiddenPassed = 0
+
+      results.forEach((result: { status: string; test_case_index: number }) => {
+        if (result.status === 'Accepted') {
+          if (result.test_case_index < builtInVisible.length) {
+            visiblePassed++
+          } else if (result.test_case_index < builtInVisible.length + builtInHidden.length) {
+            hiddenPassed++
+          }
+        }
+      })
+
+      const testResultsSummary = {
+        visible: { passed: visiblePassed, total: builtInVisible.length },
+        hidden: { passed: hiddenPassed, total: builtInHidden.length },
+      }
+
+      const allPassed = data.summary?.all_passed ?? false
 
       await submitInterview(allPassed)
 
-      if (allPassed) {
-        navigate(`/evaluation?interviewId=${interviewIdParam}`)
-      } else {
-        const results: TestResult[] = data.results.map(
+      // Always navigate to evaluation on submit (even if tests fail)
+      await createEvaluationWithData(testResultsSummary)
+
+      // If not all passed, also show results in UI before navigation
+      if (!allPassed && results.length > 0) {
+        const testResultsList: TestResult[] = results.map(
           (result: {
             status: string
             actual_output?: string
@@ -407,28 +495,71 @@ export default function Interview() {
             executionTime: result.execution_time_ms,
           })
         )
-        setTestResults(results)
+        setTestResults(testResultsList)
       }
     } catch (error) {
       console.error('Submit failed:', error)
+      // Still try to submit even if there was an error
+      try {
+        await submitInterview(false)
+        await createEvaluationWithData()
+      } catch {
+        setTestResults([{
+          testCase: { input: '', expected_output: '' },
+          passed: false,
+          error: error instanceof Error ? error.message : 'Submit failed',
+        }])
+      }
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, questionData, interviewIdParam, submitInterview, navigate])
+  }, [code, language, questionData, interviewIdParam, submitInterview, navigate, customTestCases])
 
-  const handleTimerComplete = useCallback(() => {
-    endInterview('timeout').then(() => {
-      navigate(`/evaluation?interviewId=${interviewIdParam}`)
-    })
-  }, [endInterview, interviewIdParam, navigate])
-
-  const handleGiveUp = useCallback(() => {
-    if (confirm('Are you sure you want to give up? Your progress will be saved.')) {
-      endInterview('give_up').then(() => {
-        navigate(`/evaluation?interviewId=${interviewIdParam}`)
-      })
+  const handleTimerComplete = useCallback(async () => {
+    await endInterview('timeout')
+    if (interviewIdParam) {
+      try {
+        const builtInVisible = questionData?.visible_test_cases || []
+        const builtInHidden = questionData?.hidden_test_cases || []
+        const { evaluation } = await api.evaluations.create({
+          interview_id: interviewIdParam,
+          test_results: {
+            visible: { passed: 0, total: builtInVisible.length },
+            hidden: { passed: 0, total: builtInHidden.length },
+          },
+          user_test_cases: customTestCases,
+        })
+        navigate(`/evaluation/${evaluation.id}`)
+      } catch {
+        console.error('Failed to create evaluation after timeout')
+        navigate('/')
+      }
     }
-  }, [endInterview, interviewIdParam, navigate])
+  }, [endInterview, interviewIdParam, navigate, questionData, customTestCases])
+
+  const handleGiveUp = useCallback(async () => {
+    if (confirm('Are you sure you want to give up? Your progress will be saved.')) {
+      await endInterview('give_up')
+      if (interviewIdParam) {
+        try {
+          const builtInVisible = questionData?.visible_test_cases || []
+          const builtInHidden = questionData?.hidden_test_cases || []
+          const { evaluation } = await api.evaluations.create({
+            interview_id: interviewIdParam,
+            test_results: {
+              visible: { passed: 0, total: builtInVisible.length },
+              hidden: { passed: 0, total: builtInHidden.length },
+            },
+            user_test_cases: customTestCases,
+          })
+          navigate(`/evaluation/${evaluation.id}`)
+        } catch {
+          console.error('Failed to create evaluation after give up')
+          navigate('/')
+        }
+      }
+    }
+  }, [endInterview, interviewIdParam, navigate, questionData, customTestCases])
 
   // Loading state
   if (isLoading) {
@@ -521,6 +652,8 @@ export default function Interview() {
             isRunning={isRunning}
             onRun={handleRun}
             onSubmit={handleSubmit}
+            customTestCases={customTestCases}
+            onCustomTestCasesChange={setCustomTestCases}
           />
         }
       />

@@ -112,3 +112,34 @@ export interface ExecutionResult {
   memory_kb?: number
   error?: string
 }
+
+export interface Evaluation {
+  id: string
+  interview_id: string
+  test_case_coverage_score?: number
+  thought_process_score?: number
+  clarifying_questions_score?: number
+  edge_case_score?: number
+  time_management_score?: number
+  complexity_analysis_score?: number
+  code_quality_score?: number
+  overall_score?: number
+  verdict?: 'PASS' | 'FAIL'
+  feedback?: EvaluationFeedback
+  solution_code?: string
+  solution_explanation?: SolutionStep[]
+  created_at: string
+}
+
+export interface EvaluationFeedback {
+  strengths: string[]
+  improvements: string[]
+  detailed_notes: string
+}
+
+export interface SolutionStep {
+  line_number: number
+  explanation: string
+  variables: Record<string, unknown>
+  visualization_data?: unknown
+}

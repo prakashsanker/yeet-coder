@@ -15,6 +15,8 @@ interface TestCasesPanelProps {
   isRunning?: boolean
   onRun?: () => void
   onSubmit?: () => void
+  customTestCases?: TestCase[]
+  onCustomTestCasesChange?: (testCases: TestCase[]) => void
 }
 
 export default function TestCasesPanel({
@@ -23,8 +25,33 @@ export default function TestCasesPanel({
   isRunning = false,
   onRun,
   onSubmit,
+  customTestCases = [],
+  onCustomTestCasesChange,
 }: TestCasesPanelProps) {
   const [activeTab, setActiveTab] = useState<'cases' | 'results'>('cases')
+  const [isAddingTestCase, setIsAddingTestCase] = useState(false)
+  const [newInput, setNewInput] = useState('')
+  const [newExpectedOutput, setNewExpectedOutput] = useState('')
+
+  const allTestCases = [...testCases, ...customTestCases]
+
+  const handleAddTestCase = () => {
+    if (newInput.trim() || newExpectedOutput.trim()) {
+      const newTestCase: TestCase = {
+        input: newInput,
+        expected_output: newExpectedOutput,
+      }
+      onCustomTestCasesChange?.([...customTestCases, newTestCase])
+      setNewInput('')
+      setNewExpectedOutput('')
+      setIsAddingTestCase(false)
+    }
+  }
+
+  const handleRemoveCustomTestCase = (index: number) => {
+    const updated = customTestCases.filter((_, i) => i !== index)
+    onCustomTestCasesChange?.(updated)
+  }
 
   const passedCount = results.filter((r) => r.passed).length
   const totalCount = results.length
@@ -70,9 +97,10 @@ export default function TestCasesPanel({
       <div className="flex-1 overflow-auto p-4">
         {activeTab === 'cases' ? (
           <div className="space-y-4">
+            {/* Built-in test cases */}
             {testCases.map((testCase, index) => (
               <div
-                key={index}
+                key={`builtin-${index}`}
                 className="bg-gray-700 rounded-lg p-3 space-y-2"
               >
                 <div className="text-sm text-gray-400">Case {index + 1}</div>
@@ -90,9 +118,98 @@ export default function TestCasesPanel({
                 </div>
               </div>
             ))}
-            {testCases.length === 0 && (
-              <div className="text-gray-400 text-sm text-center py-8">
-                No test cases available
+
+            {/* Custom test cases */}
+            {customTestCases.map((testCase, index) => (
+              <div
+                key={`custom-${index}`}
+                className="bg-gray-700 rounded-lg p-3 space-y-2 border border-blue-600/50"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-blue-400">Custom Case {index + 1}</div>
+                  <button
+                    onClick={() => handleRemoveCustomTestCase(index)}
+                    className="text-gray-400 hover:text-red-400 transition-colors"
+                    title="Remove test case"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">Input:</div>
+                  <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                    {testCase.input || '(empty)'}
+                  </pre>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">Expected Output:</div>
+                  <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                    {testCase.expected_output || '(empty)'}
+                  </pre>
+                </div>
+              </div>
+            ))}
+
+            {/* Add test case form */}
+            {isAddingTestCase ? (
+              <div className="bg-gray-700 rounded-lg p-3 space-y-3 border border-blue-600">
+                <div className="text-sm text-blue-400">Add Custom Test Case</div>
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">Input:</div>
+                  <textarea
+                    value={newInput}
+                    onChange={(e) => setNewInput(e.target.value)}
+                    placeholder="Enter input..."
+                    className="w-full text-sm text-gray-200 bg-gray-800 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">Expected Output:</div>
+                  <textarea
+                    value={newExpectedOutput}
+                    onChange={(e) => setNewExpectedOutput(e.target.value)}
+                    placeholder="Enter expected output..."
+                    className="w-full text-sm text-gray-200 bg-gray-800 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    rows={2}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAddTestCase}
+                    className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTestCase(false)
+                      setNewInput('')
+                      setNewExpectedOutput('')
+                    }}
+                    className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAddingTestCase(true)}
+                className="w-full py-2 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Custom Test Case
+              </button>
+            )}
+
+            {allTestCases.length === 0 && !isAddingTestCase && (
+              <div className="text-gray-400 text-sm text-center py-4">
+                No test cases yet. Add your own above.
               </div>
             )}
           </div>

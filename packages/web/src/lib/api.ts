@@ -155,6 +155,51 @@ export const api = {
         body: JSON.stringify(params),
       }),
   },
+  evaluations: {
+    create: (params: CreateEvaluationParams) =>
+      fetchApi<{ success: boolean; evaluation: Evaluation; existing?: boolean }>('/api/evaluations', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+    get: (id: string) =>
+      fetchApi<{ success: boolean; evaluation: Evaluation }>(`/api/evaluations/${id}`),
+    getByInterview: (interviewId: string) =>
+      fetchApi<{ success: boolean; evaluation: Evaluation }>(`/api/evaluations/interview/${interviewId}`),
+    rerun: (id: string) =>
+      fetchApi<{ success: boolean; evaluation: Evaluation }>(`/api/evaluations/${id}/rerun`, {
+        method: 'POST',
+      }),
+  },
+}
+
+export interface CreateEvaluationParams {
+  interview_id: string
+  test_results?: {
+    visible: { passed: number; total: number }
+    hidden: { passed: number; total: number }
+  }
+  user_test_cases?: { input: string; expected_output: string }[]
+}
+
+export interface Evaluation {
+  id: string
+  interview_id: string
+  test_case_coverage_score?: number
+  thought_process_score?: number
+  clarifying_questions_score?: number
+  edge_case_score?: number
+  time_management_score?: number
+  complexity_analysis_score?: number
+  code_quality_score?: number
+  overall_score?: number
+  verdict?: 'PASS' | 'FAIL'
+  feedback?: {
+    strengths: string[]
+    improvements: string[]
+    detailed_notes: string
+  }
+  solution_code?: string
+  created_at: string
 }
 
 interface Topic {
