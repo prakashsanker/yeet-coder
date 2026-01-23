@@ -157,6 +157,7 @@ export interface Evaluation {
   communication_score?: number
   // Common fields
   overall_score?: number
+  verdict?: 'PASS' | 'FAIL'
   feedback?: EvaluationFeedback | SystemDesignFeedback
   solution_code?: string
   solution_explanation?: SolutionStep[]
