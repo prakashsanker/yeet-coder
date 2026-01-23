@@ -87,7 +87,8 @@ export default function Onboarding() {
 
   const getCurrentStep = (): Step => {
     if (!interviewType) return 'type'
-    if (interviewType === 'leetcode' && !selectedTopic) return 'topic'
+    // Skip topic selection if question is already pre-selected
+    if (interviewType === 'leetcode' && !selectedTopic && !selectedQuestion) return 'topic'
     if (!selectedQuestion) return 'question'
     return 'confirm'
   }
