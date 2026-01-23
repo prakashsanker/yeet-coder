@@ -66,6 +66,158 @@ router.post(
   }
 )
 
+// GET /api/stripe/subscription-details - Get detailed subscription info from Stripe
+router.get(
+  '/subscription-details',
+  authMiddleware,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' })
+      }
+
+      // Get the user's stripe_customer_id
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id, subscription_tier')
+        .eq('id', userId)
+        .single()
+
+      if (profileError || !profile) {
+        return res.json({
+          success: true,
+          subscription: {
+            tier: 'free',
+            status: null,
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: null,
+          },
+        })
+      }
+
+      if (!profile.stripe_customer_id || profile.subscription_tier !== 'pro') {
+        return res.json({
+          success: true,
+          subscription: {
+            tier: profile.subscription_tier || 'free',
+            status: null,
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: null,
+          },
+        })
+      }
+
+      // Get the customer's active subscriptions
+      const subscriptions = await stripe.subscriptions.list({
+        customer: profile.stripe_customer_id,
+        limit: 1,
+      })
+
+      if (subscriptions.data.length === 0) {
+        return res.json({
+          success: true,
+          subscription: {
+            tier: profile.subscription_tier,
+            status: null,
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: null,
+          },
+        })
+      }
+
+      const subscription = subscriptions.data[0] as Stripe.Subscription & {
+        current_period_end?: number
+      }
+
+      return res.json({
+        success: true,
+        subscription: {
+          tier: profile.subscription_tier,
+          status: subscription.status,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          currentPeriodEnd: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
+        },
+      })
+    } catch (err) {
+      console.error('Error fetching subscription details:', err)
+      return res.status(500).json({ error: 'Failed to fetch subscription details' })
+    }
+  }
+)
+
+// POST /api/stripe/cancel-subscription - Cancel user's subscription
+router.post(
+  '/cancel-subscription',
+  authMiddleware,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' })
+      }
+
+      // Get the user's stripe_customer_id
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id, subscription_tier')
+        .eq('id', userId)
+        .single()
+
+      if (profileError || !profile) {
+        console.error('Error fetching profile:', profileError)
+        return res.status(404).json({ error: 'User profile not found' })
+      }
+
+      if (profile.subscription_tier !== 'pro') {
+        return res.status(400).json({ error: 'No active subscription to cancel' })
+      }
+
+      if (!profile.stripe_customer_id) {
+        return res.status(400).json({ error: 'No Stripe customer found' })
+      }
+
+      // Get the customer's active subscriptions
+      const subscriptions = await stripe.subscriptions.list({
+        customer: profile.stripe_customer_id,
+        status: 'active',
+        limit: 1,
+      })
+
+      if (subscriptions.data.length === 0) {
+        // No active subscription found, but user is marked as pro - sync the state
+        await supabase
+          .from('profiles')
+          .update({ subscription_tier: 'free' })
+          .eq('id', userId)
+
+        return res.status(400).json({ error: 'No active subscription found' })
+      }
+
+      // Cancel the subscription at period end (gives user access until billing period ends)
+      const subscription = await stripe.subscriptions.update(
+        subscriptions.data[0].id,
+        { cancel_at_period_end: true }
+      )
+
+      console.log(`[STRIPE] Subscription ${subscription.id} set to cancel at period end for user ${userId}`)
+
+      return res.json({
+        success: true,
+        message: 'Subscription will be cancelled at the end of the billing period',
+        cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+      })
+    } catch (err) {
+      console.error('Error cancelling subscription:', err)
+      return res.status(500).json({ error: 'Failed to cancel subscription' })
+    }
+  }
+)
+
 // POST /api/stripe/webhook - Handle Stripe webhooks
 // Note: This needs raw body, configured in index.ts
 router.post('/webhook', async (req: Request, res: Response) => {
