@@ -14,9 +14,11 @@
     "build:server": "yarn workspace @yeetcoder/server build",
     "lint": "yarn workspace @yeetcoder/web lint && yarn workspace @yeetcoder/server lint",
     "typecheck": "yarn workspace @yeetcoder/web typecheck && yarn workspace @yeetcoder/server typecheck",
-    "db:push": "supabase db push"
+    "db:push": "supabase db push",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "typescript": "^5.3.3"
   }
 }
