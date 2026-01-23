@@ -24,10 +24,15 @@ const updateInterviewSchema = z.object({
     speaker: z.enum(['user', 'interviewer']),
     text: z.string(),
   }).optional(),
+  // System design specific fields
+  drawing_data: z.object({
+    elements: z.array(z.any()),
+  }).optional(),
+  notes: z.string().optional(),
 })
 
 const endInterviewSchema = z.object({
-  final_code: z.string(),
+  final_code: z.string().optional(), // Optional for system design interviews
   reason: z.enum(['submit', 'give_up', 'timeout']),
   time_spent_seconds: z.number(),
 })
@@ -59,6 +64,9 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
 
     const topic_id = question.topic_id
 
+    // Determine session type based on question type
+    const session_type = question.type === 'system_design' ? 'system_design' : 'coding'
+
     // Check if user is authenticated
     const userId = req.user?.id
 
@@ -70,12 +78,15 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
         topic_id,
         question_id,
         question: question as Question,
-        language,
+        session_type,
+        language: session_type === 'coding' ? language : null,
         time_limit_seconds,
         status: 'in_progress',
         run_count: 0,
         submit_count: 0,
         transcript: [],
+        drawing_data: null,
+        notes: null,
         started_at: new Date().toISOString(),
         ended_at: null,
         final_code: null,
@@ -116,12 +127,15 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
         user_id: userId,
         topic_id,
         question_id,
-        language,
+        session_type,
+        language: session_type === 'coding' ? language : null,
         time_limit_seconds,
         status: 'in_progress',
         run_count: 0,
         submit_count: 0,
         transcript: [],
+        drawing_data: null,
+        notes: null,
       })
       .select()
       .single()
@@ -249,7 +263,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       })
     }
 
-    const { code, language, time_spent_seconds, increment_run_count, transcript_entry } = parseResult.data
+    const { code, language, time_spent_seconds, increment_run_count, transcript_entry, drawing_data, notes } = parseResult.data
 
     // First, get the current interview state
     const { data: currentInterview, error: fetchError } = await supabase
@@ -290,6 +304,15 @@ router.patch('/:id', async (req: Request, res: Response) => {
       updateData.transcript = [...currentTranscript, transcript_entry]
     }
 
+    // System design specific updates
+    if (drawing_data !== undefined) {
+      updateData.drawing_data = drawing_data
+    }
+
+    if (notes !== undefined) {
+      updateData.notes = notes
+    }
+
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No updates provided' })
     }
@@ -308,6 +331,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     console.log(`[INTERVIEW] Updated interview ${id}`, {
       hasCode: !!code,
+      hasDrawing: !!drawing_data,
+      hasNotes: !!notes,
       incrementedRun: !!increment_run_count,
       newRunCount: interview.run_count,
       transcriptLength: interview.transcript?.length || 0,
@@ -395,14 +420,20 @@ router.post('/:id/end', async (req: Request, res: Response) => {
 
     const status = reason === 'submit' ? 'completed' : 'abandoned'
 
+    // Build update object - final_code is optional for system design interviews
+    const updateObj: Record<string, unknown> = {
+      status,
+      time_spent_seconds,
+      ended_at: new Date().toISOString(),
+    }
+
+    if (final_code !== undefined) {
+      updateObj.final_code = final_code
+    }
+
     const { data: interview, error } = await supabase
       .from('interview_sessions')
-      .update({
-        final_code,
-        status,
-        time_spent_seconds,
-        ended_at: new Date().toISOString(),
-      })
+      .update(updateObj)
       .eq('id', id)
       .select()
       .single()

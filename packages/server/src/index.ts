@@ -8,6 +8,7 @@ import topicsRoutes from './routes/topics'
 import questionsRoutes from './routes/questions'
 import voiceRoutes from './routes/voice'
 import interviewsRoutes from './routes/interviews'
+import evaluationsRoutes from './routes/evaluations'
 import { setupWebSocket } from './websocket'
 
 const DEFAULT_PORT = parseInt(process.env.PORT || '3001', 10)
@@ -55,7 +56,7 @@ async function main() {
 
   // Middleware
   app.use(cors())
-  app.use(express.json())
+  app.use(express.json({ limit: '50mb' })) // Increased limit for audio data
 
   // Health check
   app.get('/api/health', (_req, res) => {
@@ -68,6 +69,7 @@ async function main() {
   app.use('/api/execute', executionRoutes)
   app.use('/api/voice', voiceRoutes)
   app.use('/api/interviews', interviewsRoutes)
+  app.use('/api/evaluations', evaluationsRoutes)
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`)

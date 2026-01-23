@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -31,13 +31,20 @@ export default function Landing() {
   const { user, isLoading, signInWithGoogle } = useAuth()
   const [authError, setAuthError] = useState<string | null>(null)
 
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate('/dashboard')
+    }
+  }, [user, isLoading, navigate])
+
   const handlePracticeNow = async () => {
     setAuthError(null)
     if (user) {
-      // Already authenticated, go to onboarding
-      navigate('/onboarding')
+      // Already authenticated, go to dashboard
+      navigate('/dashboard')
     } else {
-      // Need to authenticate first - will redirect to /onboarding after callback
+      // Need to authenticate first - will redirect to /dashboard after callback
       try {
         await signInWithGoogle()
       } catch (error) {
@@ -58,11 +65,6 @@ export default function Landing() {
                 <span className="text-lc-bg-dark font-bold text-lg">Y</span>
               </div>
               <span className="text-lc-text-primary font-semibold text-lg">YeetCoder</span>
-            </div>
-            <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-lc-text-secondary hover:text-lc-text-primary transition-colors text-sm">Features</a>
-              <a href="#testimonials" className="text-lc-text-secondary hover:text-lc-text-primary transition-colors text-sm">Testimonials</a>
-              <span className="text-brand-orange text-sm font-medium">Premium</span>
             </div>
             {user ? (
               <div className="flex items-center gap-2">
