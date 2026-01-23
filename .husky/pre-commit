@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# Run type checking before commit
+npm run typecheck

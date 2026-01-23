@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
-import { api, ApiError, type Question, type Evaluation, type InterviewSession, type Topic } from '../lib/api'
+import { api, type Question, type Evaluation, type InterviewSession, type Topic } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 
 type Tab = 'neetcode' | 'system_design' | 'history'
@@ -60,12 +60,7 @@ export default function Dashboard() {
   const [selectedTopic, setSelectedTopic] = useState<TopicWithProgress | null>(null)
   const [isLoadingRoadmap, setIsLoadingRoadmap] = useState(true)
   const hasLoadedRoadmapRef = useRef(false)
-  const [isStartingInterview, setIsStartingInterview] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
-  const [existingInterviewForPaywall, setExistingInterviewForPaywall] = useState<{
-    id: string
-    session_type: 'coding' | 'system_design'
-  } | null>(null)
 
   // Handle upgrade success query param
   useEffect(() => {
@@ -203,35 +198,6 @@ export default function Dashboard() {
   const handleStartPractice = (question: Question) => {
     // Navigate to onboarding with pre-selected question (for system design)
     navigate('/onboarding', { state: { selectedQuestion: question } })
-  }
-
-  // Start interview directly (for NeetCode questions)
-  const handleStartInterviewDirectly = async (question: Question) => {
-    setIsStartingInterview(true)
-    try {
-      const { interview } = await api.interviews.create({
-        question_id: question.id,
-        language: 'python',
-      })
-
-      // Navigate to the interview page
-      navigate(`/interview/${interview.id}`)
-    } catch (err) {
-      console.error('Failed to create interview:', err)
-
-      // Check if this is a free tier limit error
-      if (err instanceof ApiError && err.code === 'free_tier_limit') {
-        const existingInterviewData = err.data?.existingInterview as {
-          id: string
-          session_type: 'coding' | 'system_design'
-        } | undefined
-
-        setExistingInterviewForPaywall(existingInterviewData || null)
-        setShowPaywall(true)
-      }
-    } finally {
-      setIsStartingInterview(false)
-    }
   }
 
   const getTopicBySlug = (slug: string) => {
@@ -761,7 +727,7 @@ export default function Dashboard() {
       <PaywallModal
         isOpen={showPaywall}
         onClose={() => setShowPaywall(false)}
-        existingInterview={existingInterviewForPaywall}
+        existingInterview={null}
       />
     </div>
   )
