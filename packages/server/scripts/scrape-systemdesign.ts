@@ -274,11 +274,8 @@ async function extractQuestionContent(page: Page, info: QuestionInfo): Promise<E
     const slugMatch = info.url.match(/\/question\/([^/]+)/);
     const slug = slugMatch ? slugMatch[1] : info.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    // Create a description from the title and key considerations
-    let description = info.title;
-    if (content.key_considerations.length > 0) {
-      description += '\n\nKey considerations:\n' + content.key_considerations.map(c => `• ${c}`).join('\n');
-    }
+    // Description is just the title - don't include key considerations (they're hints)
+    const description = info.title;
 
     return {
       title: info.title,
@@ -318,7 +315,7 @@ async function saveToDatabase(question: ExtractedQuestion): Promise<boolean> {
           key_considerations: question.key_considerations,
           solution_links: question.solution_links
         },
-        hints: question.key_considerations // Use key considerations as hints
+        hints: [] // Don't include hints - let candidates figure it out
       }, {
         onConflict: 'slug'
       });

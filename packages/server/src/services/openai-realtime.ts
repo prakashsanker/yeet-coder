@@ -102,6 +102,8 @@ export class OpenAIRealtimeClient {
       const url = `wss://api.openai.com/v1/realtime?model=${this.config.model}`
 
       console.log('[Realtime] Connecting to OpenAI Realtime API...')
+      console.log('[Realtime] URL:', url)
+      console.log('[Realtime] API Key configured:', OPENAI_API_KEY ? `${OPENAI_API_KEY.substring(0, 8)}...` : 'NOT SET')
 
       this.ws = new WebSocket(url, {
         headers: {
@@ -111,7 +113,7 @@ export class OpenAIRealtimeClient {
       })
 
       this.ws.on('open', () => {
-        console.log('[Realtime] WebSocket connected')
+        console.log('[Realtime] WebSocket connected successfully!')
         this.isConnected = true
         this.configureSession()
         resolve()
@@ -126,16 +128,35 @@ export class OpenAIRealtimeClient {
         }
       })
 
-      this.ws.on('error', (error) => {
-        console.error('[Realtime] WebSocket error:', error)
+      this.ws.on('error', (error: Error & { code?: string }) => {
+        console.error('[Realtime] WebSocket error:', error.message)
+        console.error('[Realtime] Error code:', error.code)
+        console.error('[Realtime] Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
         this.handlers.onError?.(error as Error)
         reject(error)
       })
 
-      this.ws.on('close', () => {
+      this.ws.on('close', (code: number, reason: Buffer) => {
         console.log('[Realtime] WebSocket closed')
+        console.log('[Realtime] Close code:', code)
+        console.log('[Realtime] Close reason:', reason.toString())
         this.isConnected = false
         this.handlers.onClose?.()
+      })
+
+      // Add unexpected response handler
+      this.ws.on('unexpected-response', (_request, response) => {
+        console.error('[Realtime] Unexpected response from server!')
+        console.error('[Realtime] Response status:', response.statusCode)
+        console.error('[Realtime] Response headers:', JSON.stringify(response.headers))
+        let body = ''
+        response.on('data', (chunk: Buffer) => {
+          body += chunk.toString()
+        })
+        response.on('end', () => {
+          console.error('[Realtime] Response body:', body)
+          reject(new Error(`Unexpected response: ${response.statusCode} - ${body}`))
+        })
       })
     })
   }
@@ -370,6 +391,37 @@ export class OpenAIRealtimeClient {
     })
 
     this.createResponse()
+  }
+
+  /**
+   * Have the AI speak a specific text (for introductions, prompts, etc.)
+   * This sends a user instruction to deliver the text, and the model responds with audio.
+   */
+  speakText(text: string): void {
+    if (!this.isConnected) return
+
+    // Create a user message instructing the model to deliver this introduction
+    this.sendEvent({
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: `Please deliver this introduction to the candidate exactly as written, speaking naturally and warmly:\n\n"${text}"`,
+          },
+        ],
+      },
+    })
+
+    // Trigger audio response
+    this.sendEvent({
+      type: 'response.create',
+      response: {
+        modalities: ['audio', 'text'],
+      },
+    })
   }
 
   /**

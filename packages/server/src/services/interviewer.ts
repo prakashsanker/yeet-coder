@@ -32,9 +32,9 @@ export async function getInterviewerResponse(
   currentQuestion: string,
   userCode: string
 ): Promise<string> {
-  // If no transcript, generate initial greeting
+  // If no transcript, generate initial greeting with the problem introduction
   if (transcript.length === 0) {
-    return generateGreeting()
+    return generateGreeting(currentQuestion)
   }
 
   // Build conversation context
@@ -64,14 +64,27 @@ export async function getInterviewerResponse(
   }
 }
 
-async function generateGreeting(): Promise<string> {
+async function generateGreeting(currentQuestion?: string): Promise<string> {
   try {
+    // If we have a question, include it in the introduction
+    const prompt = currentQuestion
+      ? `Generate a brief, warm greeting to start the interview. Introduce the following problem and encourage them to think out loud. Keep it to 3-4 sentences.
+
+Problem:
+${currentQuestion}
+
+Your greeting should:
+1. Welcome them warmly
+2. Briefly describe what they'll be working on (summarize the problem in 1 sentence)
+3. Encourage them to think out loud and ask clarifying questions`
+      : GREETING_PROMPT
+
     const response = await generateText(
       [
         { role: 'system', content: INTERVIEWER_SYSTEM_PROMPT },
-        { role: 'user', content: GREETING_PROMPT },
+        { role: 'user', content: prompt },
       ],
-      { maxTokens: 128, temperature: 0.8 }
+      { maxTokens: 200, temperature: 0.8 }
     )
     return response
   } catch (error) {
