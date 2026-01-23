@@ -6,7 +6,25 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
+
     if (session?.access_token) {
+      // Check if token is expired or about to expire (within 60 seconds)
+      const expiresAt = session.expires_at ? session.expires_at * 1000 : 0
+      const now = Date.now()
+
+      if (expiresAt && expiresAt < now + 60000) {
+        // Token expired or expiring soon, try to refresh
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+
+        if (refreshError || !refreshData.session) {
+          // Sign out to force re-login
+          await supabase.auth.signOut()
+          return {}
+        }
+
+        return { Authorization: `Bearer ${refreshData.session.access_token}` }
+      }
+
       return { Authorization: `Bearer ${session.access_token}` }
     }
   } catch (error) {
@@ -44,6 +62,19 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+
+    // If we get a 401, the token is invalid - force clear session and redirect
+    if (response.status === 401) {
+      // Clear all Supabase auth data from localStorage
+      const keysToRemove = Object.keys(localStorage).filter(
+        (key) => key.startsWith('sb-') && key.includes('-auth-')
+      )
+      keysToRemove.forEach((key) => localStorage.removeItem(key))
+      // Redirect to home page
+      window.location.href = '/'
+      return undefined as T // Won't actually return, page will reload
+    }
+
     const error = new ApiError(
       errorData.message || errorData.error || `HTTP ${response.status}`,
       response.status,
@@ -226,10 +257,25 @@ export const api = {
           } | null
         }
       }>('/api/users/subscription'),
+    getDetails: () =>
+      fetchApi<{
+        success: boolean
+        subscription: {
+          tier: 'free' | 'pro'
+          status: string | null
+          cancelAtPeriodEnd: boolean
+          currentPeriodEnd: string | null
+        }
+      }>('/api/stripe/subscription-details'),
     createCheckout: () =>
       fetchApi<{ success: boolean; url: string }>('/api/stripe/create-checkout-session', {
         method: 'POST',
       }),
+    cancel: () =>
+      fetchApi<{ success: boolean; message: string; cancelAt: string | null }>(
+        '/api/stripe/cancel-subscription',
+        { method: 'POST' }
+      ),
   },
 }
 
