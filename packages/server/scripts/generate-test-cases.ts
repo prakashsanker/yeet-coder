@@ -1,6 +1,6 @@
 /**
  * Script to generate test cases for questions that don't have them.
- * Uses incremental batch generation to avoid response truncation.
+ * Uses Claude Opus 4.5 to analyze the question and generate comprehensive test cases.
  *
  * Usage:
  *   npx tsx scripts/generate-test-cases.ts              # Process all questions without test cases
@@ -24,7 +24,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 interface TestCase {
   input: string
   expected_output: string
-  category?: string
+  category?: string // For documentation purposes
 }
 
 interface Question {
@@ -43,58 +43,141 @@ interface Question {
   } | null
 }
 
-interface BatchTestCases {
-  test_cases: TestCase[]
+interface GeneratedTestCases {
+  visible_test_cases: TestCase[]
+  hidden_test_cases: TestCase[]
 }
 
-// Simplified prompt for batch generation
-const BATCH_SYSTEM_PROMPT = `You are a test case generator for coding problems. Generate exactly the requested number of test cases.
+const SYSTEM_PROMPT = `You are an expert algorithm engineer and test case designer. Your job is to create comprehensive test cases for LeetCode-style coding problems.
 
-OUTPUT FORMAT - Return ONLY valid JSON:
+Given a coding problem, you must generate test cases that thoroughly verify:
+1. **Correctness** - The solution produces the right output
+2. **Edge cases** - Boundary conditions and special inputs
+3. **Time complexity** - Large inputs to verify O(n), O(n log n), etc.
+4. **Space complexity** - Inputs that stress memory usage
+
+## TEST CASE CATEGORIES
+
+### Visible Test Cases (3-5 cases)
+These help users understand the problem. Include:
+- Basic example that matches the problem description
+- Simple edge case (e.g., empty input, single element)
+- Moderate complexity case
+
+### Hidden Test Cases (8-12 cases)
+These thoroughly test the solution. MUST include:
+
+**Category 1: Edge Cases**
+- Empty input (empty array, empty string, n=0)
+- Single element
+- Two elements
+- All same values
+- Null/None handling if applicable
+
+**Category 2: Boundary Values**
+- Minimum values from constraints (e.g., n=1, values=-10^9)
+- Maximum values from constraints (e.g., n=10^5, values=10^9)
+- Values at constraint boundaries
+
+**Category 3: Special Cases**
+- Already sorted input (if sorting involved)
+- Reverse sorted input
+- Duplicates
+- Negative numbers (if applicable)
+- All positive / all negative
+
+**Category 4: Performance/Stress Tests**
+- Large input to test time complexity:
+  - For O(n): array of 10,000-50,000 elements
+  - For O(n log n): array of 50,000-100,000 elements
+  - For O(n^2) acceptable: array of 1,000-5,000 elements
+- Worst case input for the algorithm
+- Input that would cause timeout if using brute force
+
+**Category 5: Algorithm-Specific**
+- Cases that test the core algorithm insight
+- Cases where greedy fails but optimal works
+- Cases that require the full algorithm, not shortcuts
+
+## OUTPUT FORMAT
+
+Return a JSON object with this EXACT structure:
 {
-  "test_cases": [
-    { "input": "input string", "expected_output": "output string", "category": "category_name" }
+  "visible_test_cases": [
+    { "input": "input as string", "expected_output": "output as string", "category": "basic" }
+  ],
+  "hidden_test_cases": [
+    { "input": "input as string", "expected_output": "output as string", "category": "edge_case" },
+    { "input": "[large array...]", "expected_output": "output", "category": "performance" }
   ]
 }
 
-CRITICAL RULES:
-- Return ONLY valid JSON, no markdown or extra text
-- For multiple parameters, separate with newlines: "[1,2,3]\\n5"
-- Arrays must be LITERAL values like "[1, 2, 3, 4, 5]" - NEVER use code expressions or list comprehensions
-- NEVER write code like "[" + ... or range() or any programming constructs
-- For large arrays, write out actual numbers: "[1, 2, 3, 4, ..., 100]" with real values
-- Escape special characters: \\n, \\"
-- Calculate correct expected_output for ALL test cases
+## INPUT/OUTPUT FORMAT RULES
+- For multiple parameters, separate with newlines: "[1,2,3]\\n5" (array and target)
+- Arrays: "[1, 2, 3]" or "[[1,2],[3,4]]" for 2D
+- Strings: Include quotes if the function expects a string parameter
+- Numbers: Just the number, e.g., "42"
+- Boolean output: "true" or "false"
+- Match the exact format expected by the function signature
+
+## CRITICAL RULES
+- Return ONLY valid JSON, no markdown or explanatory text
+- Use double quotes for strings
+- Escape special characters properly (\\n, \\", \\\\)
 - No trailing commas
-- Keep arrays reasonable size (100-500 elements max for performance tests)`
+- For performance tests, generate realistic large inputs (not placeholders)
+- Calculate the correct expected output for ALL test cases`
 
-type TestCaseType = 'visible_basic' | 'edge_case' | 'boundary' | 'special' | 'performance'
+async function generateTestCasesForQuestion(question: Question): Promise<GeneratedTestCases | null> {
+  if (question.type === 'system_design') {
+    console.log(`  Skipping system design question: ${question.title}`)
+    return null
+  }
 
-const TEST_CASE_BATCHES: { type: TestCaseType; count: number; description: string }[] = [
-  { type: 'visible_basic', count: 3, description: 'basic visible test cases that help users understand the problem' },
-  { type: 'edge_case', count: 3, description: 'edge cases: empty input, single element, two elements, all same values' },
-  { type: 'boundary', count: 2, description: 'boundary value tests using min/max from constraints' },
-  { type: 'special', count: 2, description: 'special cases: sorted input, reverse sorted, duplicates, negatives' },
-  { type: 'performance', count: 2, description: 'performance tests with arrays of 30-50 elements (write out actual literal values, NO code expressions). Keep expected_output short - if numbers would be huge, use smaller input values like [1,1,1,2,2,2...]' },
-]
-
-async function generateBatch(
-  question: Question,
-  batchType: TestCaseType,
-  count: number,
-  description: string,
-  existingTestCases: TestCase[]
-): Promise<TestCase[]> {
   const metadata = question.metadata || {}
   const constraints = metadata.constraints || []
   const starterCode = metadata.starter_code?.python || ''
 
-  const existingInputs = existingTestCases.map(tc => tc.input).join('\n- ')
-  const existingSection = existingTestCases.length > 0
-    ? `\n\nALREADY GENERATED (DO NOT DUPLICATE):\n- ${existingInputs}`
-    : ''
+  // Analyze constraints to determine appropriate test sizes
+  let maxArraySize = 1000 // default
+  let maxValue = 10000 // default
 
-  const userPrompt = `Generate exactly ${count} ${description} for this problem:
+  for (const constraint of constraints) {
+    // Try to extract array size constraints like "1 <= n <= 10^5" or "n <= 10000"
+    const sizeMatch = constraint.match(/n\s*<=?\s*(\d+(?:\^\d+)?)/i) ||
+                      constraint.match(/length\s*<=?\s*(\d+(?:\^\d+)?)/i) ||
+                      constraint.match(/(\d+(?:\^\d+)?)\s*elements?/i)
+    if (sizeMatch) {
+      const sizeStr = sizeMatch[1]
+      if (sizeStr.includes('^')) {
+        const [base, exp] = sizeStr.split('^').map(Number)
+        maxArraySize = Math.pow(base, exp)
+      } else {
+        maxArraySize = parseInt(sizeStr, 10)
+      }
+    }
+
+    // Try to extract value constraints
+    const valueMatch = constraint.match(/(?:nums|val|value).*?<=?\s*(\d+(?:\^\d+)?)/i) ||
+                       constraint.match(/(-?\d+(?:\^\d+)?)\s*<=?\s*.*?<=?\s*(\d+(?:\^\d+)?)/i)
+    if (valueMatch) {
+      const valStr = valueMatch[valueMatch.length - 1]
+      if (valStr.includes('^')) {
+        const [base, exp] = valStr.split('^').map(Number)
+        maxValue = Math.pow(base, exp)
+      } else {
+        maxValue = parseInt(valStr, 10)
+      }
+    }
+  }
+
+  // Recommend appropriate performance test sizes
+  const recommendedPerfSize = Math.min(maxArraySize, 10000) // Cap at 10k for reasonable test execution
+  const recommendedLargePerfSize = Math.min(maxArraySize, 50000)
+
+  const userPrompt = `Generate comprehensive test cases for this coding problem:
+
+## PROBLEM DETAILS
 
 **Title:** ${question.title}
 **Difficulty:** ${question.difficulty}
@@ -103,99 +186,85 @@ async function generateBatch(
 ${question.description}
 
 **Examples:**
-${question.examples?.map((ex, i) => `${i + 1}. Input: ${ex.input} → Output: ${ex.output}`).join('\n') || 'None'}
+${question.examples?.map((ex, i) => `Example ${i + 1}:
+  Input: ${ex.input}
+  Output: ${ex.output}
+  ${ex.explanation ? `Explanation: ${ex.explanation}` : ''}`).join('\n\n') || 'No examples provided'}
 
 **Constraints:**
-${constraints.join('\n') || 'None'}
+${constraints.length > 0 ? constraints.join('\n') : 'No constraints provided'}
 
-**Starter Code:**
-${starterCode || 'None'}
-${existingSection}
+**Starter Code (Python):**
+\`\`\`python
+${starterCode || 'No starter code provided'}
+\`\`\`
 
-Generate exactly ${count} NEW test cases with category "${batchType}". Make sure expected_output is correct.`
+## REQUIREMENTS
+
+Based on the constraints, generate:
+- 3-5 visible test cases (simple, help users understand)
+- 8-12 hidden test cases including:
+  - At least 2 edge cases (empty, single element, etc.)
+  - At least 2 boundary value tests
+  - At least 2 performance tests with arrays of size ${recommendedPerfSize}-${recommendedLargePerfSize}
+  - Algorithm-specific test cases
+
+For performance tests:
+- Generate actual arrays with ${recommendedPerfSize}+ elements
+- Values should be within range [-${maxValue}, ${maxValue}]
+- Calculate the correct expected output
+
+Make sure every test case has a correct expected_output that you have verified.`
 
   const MAX_RETRIES = 3
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const result = await llm.generateJSON<BatchTestCases>(
+      console.log(`  Using Claude Opus 4.5 for generation... (attempt ${attempt}/${MAX_RETRIES})`)
+      const result = await llm.generateJSON<GeneratedTestCases>(
         [
-          { role: 'system', content: BATCH_SYSTEM_PROMPT },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
         ],
         {
-          model: 'anthropic/claude-opus-4',
+          model: 'anthropic/claude-opus-4',  // Claude Opus 4.5 via OpenRouter
           temperature: 0.2,
-          maxTokens: 2048
+          maxTokens: 8000  // Allow for large test cases
         }
       )
 
-      if (!result.test_cases?.length) {
+      // Validate the response
+      if (!result.visible_test_cases?.length || !result.hidden_test_cases?.length) {
+        console.error(`  Invalid test case structure for ${question.title}`)
         if (attempt < MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          console.log(`  Retrying...`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
           continue
         }
-        return []
+        return null
       }
 
-      // Add category to each test case
-      return result.test_cases.map(tc => ({ ...tc, category: batchType }))
+      // Log category breakdown
+      const categories: Record<string, number> = {}
+      for (const tc of result.hidden_test_cases) {
+        const cat = tc.category || 'uncategorized'
+        categories[cat] = (categories[cat] || 0) + 1
+      }
+      console.log(`  Categories:`, Object.entries(categories).map(([k, v]) => `${k}(${v})`).join(', '))
+
+      return result
     } catch (error) {
-      console.error(`    Batch ${batchType} attempt ${attempt} failed:`, error instanceof Error ? error.message : error)
+      console.error(`  Error generating test cases for ${question.title} (attempt ${attempt}):`, error instanceof Error ? error.message : error)
       if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        console.log(`  Retrying in 3 seconds...`)
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      } else {
+        return null
       }
     }
   }
-  return []
-}
 
-async function generateTestCasesForQuestion(question: Question): Promise<{ visible: TestCase[]; hidden: TestCase[] } | null> {
-  if (question.type === 'system_design') {
-    console.log(`  Skipping system design question: ${question.title}`)
-    return null
-  }
-
-  const allTestCases: TestCase[] = []
-  const visibleTestCases: TestCase[] = []
-  const hiddenTestCases: TestCase[] = []
-
-  for (const batch of TEST_CASE_BATCHES) {
-    console.log(`    Generating ${batch.count} ${batch.type} test cases...`)
-
-    const newCases = await generateBatch(
-      question,
-      batch.type,
-      batch.count,
-      batch.description,
-      allTestCases
-    )
-
-    if (newCases.length === 0) {
-      console.log(`    Warning: No test cases generated for ${batch.type}`)
-      continue
-    }
-
-    console.log(`    ✓ Got ${newCases.length} test cases`)
-
-    // First batch goes to visible, rest to hidden
-    if (batch.type === 'visible_basic') {
-      visibleTestCases.push(...newCases)
-    } else {
-      hiddenTestCases.push(...newCases)
-    }
-
-    allTestCases.push(...newCases)
-
-    // Small delay between batches
-    await new Promise(resolve => setTimeout(resolve, 500))
-  }
-
-  if (visibleTestCases.length === 0 || hiddenTestCases.length === 0) {
-    console.log(`  Failed to generate sufficient test cases`)
-    return null
-  }
-
-  return { visible: visibleTestCases, hidden: hiddenTestCases }
+  return null
 }
 
 async function main() {
@@ -206,21 +275,24 @@ async function main() {
   const idArg = args.find((a) => a.startsWith('--id='))
   const specificId = idArg ? idArg.split('=')[1] : undefined
 
-  console.log('=== Test Case Generator (Batch Mode) ===')
+  console.log('=== Test Case Generator (Claude Opus 4.5) ===')
   console.log(`Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}`)
   if (limit) console.log(`Limit: ${limit}`)
   if (specificId) console.log(`Specific ID: ${specificId}`)
   console.log('')
 
+  // Check for OpenRouter API key
   if (!process.env.OPENROUTER_API_KEY) {
     console.error('ERROR: OPENROUTER_API_KEY is not set')
+    console.error('Please set OPENROUTER_API_KEY in your .env file to use Claude Opus 4.5')
     process.exit(1)
   }
 
+  // Build query
   let query = supabase
     .from('questions')
     .select('*')
-    .eq('type', 'coding')
+    .eq('type', 'coding') // Only coding questions need test cases
 
   if (specificId) {
     query = query.eq('id', specificId)
@@ -233,6 +305,7 @@ async function main() {
     process.exit(1)
   }
 
+  // Filter questions that need test cases
   const questionsNeedingTestCases = questions.filter((q: Question) => {
     const metadata = q.metadata || {}
     const hasVisible = metadata.visible_test_cases && metadata.visible_test_cases.length > 0
@@ -260,13 +333,23 @@ async function main() {
       continue
     }
 
-    console.log(`  Total: ${testCases.visible.length} visible, ${testCases.hidden.length} hidden`)
+    console.log(`  Generated ${testCases.visible_test_cases.length} visible, ${testCases.hidden_test_cases.length} hidden test cases`)
+
+    // Check for performance test cases
+    const hasPerformanceTests = testCases.hidden_test_cases.some(tc =>
+      tc.category === 'performance' ||
+      (tc.input && tc.input.length > 1000) // Large input
+    )
+    if (hasPerformanceTests) {
+      console.log(`  Includes performance/stress tests`)
+    }
 
     if (!dryRun) {
+      // Update the question's metadata with test cases
       const updatedMetadata = {
         ...(question.metadata || {}),
-        visible_test_cases: testCases.visible,
-        hidden_test_cases: testCases.hidden,
+        visible_test_cases: testCases.visible_test_cases,
+        hidden_test_cases: testCases.hidden_test_cases,
       }
 
       const { error: updateError } = await supabase
@@ -280,16 +363,19 @@ async function main() {
         continue
       }
 
-      console.log(`  ✓ Saved to database`)
+      console.log(`  Saved to database`)
     } else {
-      console.log(`  [DRY RUN] Would save`)
+      console.log(`  [DRY RUN] Would save to database`)
+      console.log(`  Sample visible:`, JSON.stringify(testCases.visible_test_cases[0]).slice(0, 200))
+      console.log(`  Sample hidden:`, JSON.stringify(testCases.hidden_test_cases[0]).slice(0, 200))
     }
 
     successCount++
 
-    // Delay between questions
+    // Rate limiting - wait between requests (Opus is rate-limited)
     if (i < toProcess.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      console.log(`  Waiting 2s before next request...`)
+      await new Promise((resolve) => setTimeout(resolve, 2000))
     }
   }
 

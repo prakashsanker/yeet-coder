@@ -169,7 +169,7 @@ export default function Interview() {
         const initialCode = loadedInterview.final_code || qData.starter_code?.[loadedInterview.language as StarterCodeLanguage] || ''
         setCode(initialCode)
         lastSavedCodeRef.current = initialCode
-        setLanguage(loadedInterview.language)
+        setLanguage(loadedInterview.language || 'python')
         setEditorKey((k) => k + 1)
 
         console.log('[INTERVIEW] Loaded interview:', loadedInterview.id)
@@ -606,17 +606,20 @@ export default function Interview() {
     <>
       <InterviewLayout
         header={
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-4 h-14">
             <div className="flex items-center gap-4">
-              <h1
+              <button
                 onClick={() => navigate('/')}
-                className="text-lg font-semibold text-white cursor-pointer hover:text-primary-400 transition-colors"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                YeetCoder
-              </h1>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-300">{questionData.title}</span>
-              <span className="px-2 py-0.5 text-xs bg-gray-700 text-gray-400 rounded">
+                <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center">
+                  <span className="text-lc-bg-dark font-bold text-lg">Y</span>
+                </div>
+                <span className="text-lc-text-primary font-semibold text-lg">YeetCoder</span>
+              </button>
+              <span className="text-lc-text-muted">|</span>
+              <span className="text-lc-text-secondary text-sm">{questionData.title}</span>
+              <span className="px-2 py-0.5 text-xs bg-lc-bg-layer-2 text-lc-text-muted rounded">
                 Runs: {runCount}
               </span>
             </div>
@@ -628,7 +631,7 @@ export default function Interview() {
               />
               <button
                 onClick={handleGiveUp}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-lc-text-muted hover:text-lc-text-primary transition-colors"
               >
                 Give Up
               </button>

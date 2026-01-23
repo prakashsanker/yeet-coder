@@ -1,20 +1,35 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api, type Topic, type Question } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import AppHeader from '../components/common/AppHeader'
 
 type InterviewType = 'leetcode' | 'system_design' | null
 type Step = 'type' | 'topic' | 'question' | 'confirm'
 
+interface LocationState {
+  selectedQuestion?: Question
+}
+
 export default function Onboarding() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, isLoading: authLoading } = useAuth()
 
-  const [interviewType, setInterviewType] = useState<InterviewType>(null)
+  // Check if a question was pre-selected from Dashboard
+  const locationState = location.state as LocationState | null
+  const preSelectedQuestion = locationState?.selectedQuestion
+
+  const [interviewType, setInterviewType] = useState<InterviewType>(() => {
+    if (preSelectedQuestion) {
+      return preSelectedQuestion.type === 'system_design' ? 'system_design' : 'leetcode'
+    }
+    return null
+  })
   const [topics, setTopics] = useState<Topic[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
+  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(preSelectedQuestion || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -74,6 +89,11 @@ export default function Onboarding() {
   const handleBack = () => {
     const step = getCurrentStep()
     if (step === 'confirm') {
+      // If came from dashboard with pre-selected question, go back to dashboard
+      if (preSelectedQuestion) {
+        navigate('/dashboard')
+        return
+      }
       setSelectedQuestion(null)
     } else if (step === 'question') {
       if (interviewType === 'leetcode') {
@@ -87,7 +107,7 @@ export default function Onboarding() {
       setInterviewType(null)
       setTopics([])
     } else {
-      navigate('/')
+      navigate('/dashboard')
     }
   }
 
@@ -103,11 +123,15 @@ export default function Onboarding() {
       // Create interview session first
       const { interview } = await api.interviews.create({
         question_id: selectedQuestion.id,
-        language: 'python',
+        language: interviewType === 'leetcode' ? 'python' : undefined,
       })
 
-      // Navigate to the interview with the session ID
-      navigate(`/interview/${interview.id}`)
+      // Navigate to the correct interview page based on session type
+      if (interview.session_type === 'system_design') {
+        navigate(`/system-design/${interview.id}`)
+      } else {
+        navigate(`/interview/${interview.id}`)
+      }
     } catch (err) {
       console.error('Failed to create interview:', err)
       setError(err instanceof Error ? err.message : 'Failed to start interview')
@@ -137,36 +161,15 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-lc-bg-dark">
       {/* Header */}
-      <header className="border-b border-lc-border bg-lc-bg-dark/95 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleBack}
-                className="text-lc-text-muted hover:text-lc-text-primary transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center">
-                  <span className="text-lc-bg-dark font-bold text-lg">Y</span>
-                </div>
-                <span className="text-lc-text-primary font-semibold text-lg">YeetCoder</span>
-              </div>
-            </div>
-
-            {/* Progress indicator */}
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${step === 'type' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
-              <div className={`w-2 h-2 rounded-full ${step === 'topic' || (interviewType === 'system_design' && step === 'question') ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
-              <div className={`w-2 h-2 rounded-full ${step === 'question' || step === 'confirm' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
-              <div className={`w-2 h-2 rounded-full ${step === 'confirm' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
-            </div>
-          </div>
+      <AppHeader showBack onBack={handleBack}>
+        {/* Progress indicator */}
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${step === 'type' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
+          <div className={`w-2 h-2 rounded-full ${step === 'topic' || (interviewType === 'system_design' && step === 'question') ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
+          <div className={`w-2 h-2 rounded-full ${step === 'question' || step === 'confirm' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
+          <div className={`w-2 h-2 rounded-full ${step === 'confirm' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
         </div>
-      </header>
+      </AppHeader>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Step: Choose Interview Type */}

@@ -7,7 +7,7 @@
  */
 
 import { llm, type LLMModel } from './llm'
-import type { TranscriptEntry, TestCase, Evaluation, EvaluationFeedback } from '../types'
+import type { TranscriptEntry, TestCase, EvaluationFeedback } from '../types'
 
 export interface EvaluationInput {
   // Interview data

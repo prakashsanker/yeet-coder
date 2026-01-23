@@ -1,8 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import Landing from './pages/Landing'
+import Dashboard from './pages/Dashboard'
+import Roadmap from './pages/Roadmap'
 import Onboarding from './pages/Onboarding'
 import Interview from './pages/Interview'
+import SystemDesignInterview from './pages/SystemDesignInterview'
 import Evaluation from './pages/Evaluation'
 import { supabase } from './lib/supabase'
 
@@ -35,16 +38,19 @@ function AuthCallback() {
     )
   }
 
-  return <Navigate to="/onboarding" replace />
+  return <Navigate to="/dashboard" replace />
 }
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/interview/:id" element={<Interview />} />
+      <Route path="/system-design/:id" element={<SystemDesignInterview />} />
       <Route path="/evaluation/:id" element={<Evaluation />} />
     </Routes>
   )
