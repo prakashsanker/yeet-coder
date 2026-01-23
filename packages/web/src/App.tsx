@@ -8,6 +8,25 @@ import Interview from './pages/Interview'
 import SystemDesignInterview from './pages/SystemDesignInterview'
 import Evaluation from './pages/Evaluation'
 import { supabase } from './lib/supabase'
+import { useAuth } from './contexts/AuthContext'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-lc-bg-dark flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lc-green"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
+}
 
 function AuthCallback() {
   const [isProcessing, setIsProcessing] = useState(true)
@@ -45,13 +64,14 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/roadmap" element={<Roadmap />} />
-      <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/interview/:id" element={<Interview />} />
-      <Route path="/system-design/:id" element={<SystemDesignInterview />} />
-      <Route path="/evaluation/:id" element={<Evaluation />} />
+      {/* Protected routes */}
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
+      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+      <Route path="/interview/:id" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
+      <Route path="/system-design/:id" element={<ProtectedRoute><SystemDesignInterview /></ProtectedRoute>} />
+      <Route path="/evaluation/:id" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
     </Routes>
   )
 }

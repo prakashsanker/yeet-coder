@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -16,7 +17,20 @@ interface AppHeaderProps {
 
 export default function AppHeader({ showBack, onBack, children, rightContent, hideUser }: AppHeaderProps) {
   const navigate = useNavigate()
-  const { user, signInWithGoogle } = useAuth()
+  const { user, signInWithGoogle, signOut } = useAuth()
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleBack = () => {
     if (onBack) {
@@ -85,15 +99,40 @@ export default function AppHeader({ showBack, onBack, children, rightContent, hi
               >
                 Dashboard
               </button>
-              <div className="flex items-center gap-2">
-                <img
-                  src={user.user_metadata?.avatar_url || ''}
-                  alt=""
-                  className="w-8 h-8 rounded-full"
-                />
-                <span className="text-lc-text-secondary text-sm hidden sm:inline">
-                  {user.user_metadata?.full_name || user.email}
-                </span>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={user.user_metadata?.avatar_url || ''}
+                    alt=""
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <span className="text-lc-text-secondary text-sm hidden sm:inline">
+                    {user.user_metadata?.full_name || user.email}
+                  </span>
+                  <svg className="w-4 h-4 text-lc-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-lc-bg-layer-2 border border-lc-border rounded-lg shadow-lg py-1 z-50">
+                    <button
+                      onClick={async () => {
+                        await signOut()
+                        setShowDropdown(false)
+                        navigate('/')
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-lc-text-secondary hover:bg-lc-bg-layer-3 hover:text-lc-text-primary transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Log out
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (

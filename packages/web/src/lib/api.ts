@@ -15,6 +15,21 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   return {}
 }
 
+// Custom error class for API errors with additional data
+export class ApiError extends Error {
+  status: number
+  code?: string
+  data?: Record<string, unknown>
+
+  constructor(message: string, status: number, code?: string, data?: Record<string, unknown>) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.data = data
+  }
+}
+
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const authHeaders = await getAuthHeaders()
 
@@ -28,8 +43,14 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+    const error = new ApiError(
+      errorData.message || errorData.error || `HTTP ${response.status}`,
+      response.status,
+      errorData.error,
+      errorData
+    )
+    throw error
   }
 
   return response.json()
@@ -186,6 +207,27 @@ export const api = {
       fetchApi<{ success: boolean; evaluation: Evaluation }>(`/api/evaluations/interview/${interviewId}`),
     rerun: (id: string) =>
       fetchApi<{ success: boolean; evaluation: Evaluation }>(`/api/evaluations/${id}/rerun`, {
+        method: 'POST',
+      }),
+  },
+  subscription: {
+    getStatus: () =>
+      fetchApi<{
+        success: boolean
+        subscription: {
+          tier: 'free' | 'pro'
+          interviewsUsed: number
+          interviewsAllowed: number | 'unlimited'
+          existingInterview: {
+            id: string
+            question_id: string
+            session_type: 'coding' | 'system_design'
+            status: string
+          } | null
+        }
+      }>('/api/users/subscription'),
+    createCheckout: () =>
+      fetchApi<{ success: boolean; url: string }>('/api/stripe/create-checkout-session', {
         method: 'POST',
       }),
   },
