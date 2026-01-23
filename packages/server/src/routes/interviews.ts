@@ -72,34 +72,47 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
 
     // For anonymous users, return a local-only interview (not persisted to DB)
     if (!userId) {
-      const localInterview = {
-        id: `local-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        user_id: null,
-        topic_id,
-        question_id,
-        question: question as Question,
-        session_type,
-        language: session_type === 'coding' ? language : null,
-        time_limit_seconds,
-        status: 'in_progress',
-        run_count: 0,
-        submit_count: 0,
-        transcript: [],
-        drawing_data: null,
-        notes: null,
-        started_at: new Date().toISOString(),
-        ended_at: null,
-        final_code: null,
-        time_spent_seconds: null,
-      }
-
-      console.log(`[INTERVIEW] Created local interview ${localInterview.id} for anonymous user`)
-
-      return res.status(201).json({
-        success: true,
-        interview: localInterview as unknown as InterviewSession,
-        isLocal: true,
+      // Anonymous users cannot start interviews - must sign in
+      return res.status(401).json({
+        error: 'authentication_required',
+        message: 'Please sign in to start an interview',
       })
+    }
+
+    // Check subscription tier and enforce free tier limit
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', userId)
+      .single()
+
+    const subscriptionTier = profile?.subscription_tier || 'free'
+
+    if (subscriptionTier === 'free') {
+      // Count existing interviews for this user
+      const { count } = await supabase
+        .from('interview_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+
+      if (count && count >= 1) {
+        // Get their existing interview for resume link
+        const { data: existingInterview } = await supabase
+          .from('interview_sessions')
+          .select('id, question_id, session_type, status')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        console.log(`[INTERVIEW] Free tier limit reached for user ${userId}`)
+
+        return res.status(403).json({
+          error: 'free_tier_limit',
+          message: 'Free tier allows 1 interview. Upgrade to Pro for unlimited access.',
+          existingInterview,
+        })
+      }
     }
 
     // Ensure user profile exists (create if missing - handles case where trigger didn't run)

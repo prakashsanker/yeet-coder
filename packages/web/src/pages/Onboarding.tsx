@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { api, type Topic, type Question } from '../lib/api'
+import { api, ApiError, type Topic, type Question } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import AppHeader from '../components/common/AppHeader'
+import PaywallModal from '../components/common/PaywallModal'
 
 type InterviewType = 'leetcode' | 'system_design' | null
 type Step = 'type' | 'topic' | 'question' | 'confirm'
@@ -32,6 +33,11 @@ export default function Onboarding() {
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(preSelectedQuestion || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [existingInterview, setExistingInterview] = useState<{
+    id: string
+    session_type: 'coding' | 'system_design'
+  } | null>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -134,6 +140,20 @@ export default function Onboarding() {
       }
     } catch (err) {
       console.error('Failed to create interview:', err)
+
+      // Check if this is a free tier limit error
+      if (err instanceof ApiError && err.code === 'free_tier_limit') {
+        const existingInterviewData = err.data?.existingInterview as {
+          id: string
+          session_type: 'coding' | 'system_design'
+        } | undefined
+
+        setExistingInterview(existingInterviewData || null)
+        setShowPaywall(true)
+        setIsStarting(false)
+        return
+      }
+
       setError(err instanceof Error ? err.message : 'Failed to start interview')
       setIsStarting(false)
     }
@@ -417,6 +437,13 @@ export default function Onboarding() {
           </div>
         )}
       </main>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        existingInterview={existingInterview}
+      />
     </div>
   )
 }

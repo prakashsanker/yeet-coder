@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
 import { api, type Question, type Evaluation, type InterviewSession } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -10,14 +10,59 @@ interface EvaluationWithInterview extends Evaluation {
   interview: InterviewSession
 }
 
+interface SubscriptionStatus {
+  tier: 'free' | 'pro'
+  interviewsUsed: number
+  interviewsAllowed: number | 'unlimited'
+  existingInterview: {
+    id: string
+    question_id: string
+    session_type: 'coding' | 'system_design'
+    status: string
+  } | null
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('system_design')
   const [questions, setQuestions] = useState<Question[]>([])
   const [evaluations, setEvaluations] = useState<EvaluationWithInterview[]>([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true)
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null)
+  const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false)
+
+  // Handle upgrade success query param
+  useEffect(() => {
+    if (searchParams.get('upgraded') === 'true') {
+      setShowUpgradeSuccess(true)
+      // Clear the query param
+      setSearchParams({}, { replace: true })
+      // Hide the toast after 5 seconds
+      setTimeout(() => setShowUpgradeSuccess(false), 5000)
+    }
+  }, [searchParams, setSearchParams])
+
+  // Load subscription status
+  useEffect(() => {
+    async function loadSubscription() {
+      if (!user) {
+        setSubscription(null)
+        return
+      }
+
+      try {
+        const { subscription } = await api.subscription.getStatus()
+        setSubscription(subscription)
+      } catch (err) {
+        console.error('Failed to load subscription:', err)
+      }
+    }
+
+    loadSubscription()
+  }, [user])
 
   // Load questions based on active tab
   useEffect(() => {
@@ -106,11 +151,78 @@ export default function Dashboard() {
     return 'text-lc-red'
   }
 
+  const handleResumeInterview = () => {
+    if (!subscription?.existingInterview) return
+
+    const path = subscription.existingInterview.session_type === 'system_design'
+      ? `/system-design/${subscription.existingInterview.id}`
+      : `/interview/${subscription.existingInterview.id}`
+
+    navigate(path)
+  }
+
   return (
     <div className="min-h-screen bg-lc-bg-dark">
       <AppHeader />
 
+      {/* Upgrade success toast */}
+      {showUpgradeSuccess && (
+        <div className="fixed top-4 right-4 z-50 bg-lc-green text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>Welcome to Pro! You now have unlimited interviews.</span>
+          <button
+            onClick={() => setShowUpgradeSuccess(false)}
+            className="ml-2 text-white/80 hover:text-white"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Tier Badge */}
+        {user && subscription && (
+          <div className="mb-4 flex justify-end">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              subscription.tier === 'pro'
+                ? 'bg-lc-green/20 text-lc-green'
+                : 'bg-lc-bg-layer-2 text-lc-text-muted'
+            }`}>
+              {subscription.tier === 'pro' ? 'Pro' : 'Free'}
+            </span>
+          </div>
+        )}
+
+        {/* Resume Interview Card (for free users with existing interview) */}
+        {subscription?.tier === 'free' && subscription.existingInterview && (
+          <div className="mb-6 bg-brand-orange/10 border border-brand-orange/30 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-brand-orange/20 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-brand-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-lc-text-primary font-medium">You have an interview in progress</p>
+                  <p className="text-lc-text-muted text-sm">Resume where you left off</p>
+                </div>
+              </div>
+              <button
+                onClick={handleResumeInterview}
+                className="px-4 py-2 bg-brand-orange hover:bg-brand-orange/80 text-white font-medium rounded-lg transition-colors"
+              >
+                Resume Interview
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Main CTA */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-lc-text-primary mb-4">

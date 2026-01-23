@@ -9,6 +9,8 @@ import questionsRoutes from './routes/questions'
 import voiceRoutes from './routes/voice'
 import interviewsRoutes from './routes/interviews'
 import evaluationsRoutes from './routes/evaluations'
+import stripeRoutes from './routes/stripe'
+import usersRoutes from './routes/users'
 import { setupWebSocket } from './websocket'
 
 const DEFAULT_PORT = parseInt(process.env.PORT || '3001', 10)
@@ -56,6 +58,10 @@ async function main() {
 
   // Middleware
   app.use(cors())
+
+  // Stripe webhook needs raw body for signature verification
+  app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }))
+
   app.use(express.json({ limit: '50mb' })) // Increased limit for audio data
 
   // Health check
@@ -70,6 +76,8 @@ async function main() {
   app.use('/api/voice', voiceRoutes)
   app.use('/api/interviews', interviewsRoutes)
   app.use('/api/evaluations', evaluationsRoutes)
+  app.use('/api/stripe', stripeRoutes)
+  app.use('/api/users', usersRoutes)
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`)
