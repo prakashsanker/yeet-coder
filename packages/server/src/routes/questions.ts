@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { questionGenerator, type Difficulty } from '../services/questionGenerator.js'
+import { supabase } from '../db/supabase'
 
 const router = Router()
 
@@ -8,6 +9,69 @@ const generateQuestionSchema = z.object({
   topic: z.string().min(1, 'Topic is required'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   topicId: z.string().optional(),
+})
+
+// GET /api/questions - List questions with optional filters
+router.get('/', async (req, res) => {
+  try {
+    const { type, topic_id, difficulty, limit = '50' } = req.query
+
+    let query = supabase
+      .from('questions')
+      .select('*')
+      .order('difficulty', { ascending: true })
+      .limit(parseInt(limit as string))
+
+    if (type) {
+      query = query.eq('type', type)
+    }
+
+    if (topic_id) {
+      query = query.eq('topic_id', topic_id)
+    }
+
+    if (difficulty) {
+      query = query.eq('difficulty', difficulty)
+    }
+
+    const { data: questions, error } = await query
+
+    if (error) {
+      console.error('Error fetching questions:', error)
+      return res.status(500).json({ error: 'Failed to fetch questions' })
+    }
+
+    return res.json({ questions })
+  } catch (err) {
+    console.error('Unexpected error fetching questions:', err)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// GET /api/questions/:id - Get a specific question
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const { data: question, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Question not found' })
+      }
+      console.error('Error fetching question:', error)
+      return res.status(500).json({ error: 'Failed to fetch question' })
+    }
+
+    return res.json({ question })
+  } catch (err) {
+    console.error('Unexpected error fetching question:', err)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 router.post('/generate', async (req, res) => {

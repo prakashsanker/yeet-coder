@@ -30,12 +30,19 @@ export default function FloatingInterviewer({
 
   // Auto-enable always-listening after introduction completes
   useEffect(() => {
+    console.log('[FloatingInterviewer] Auto-enable check:', { hasIntroduced, isAlwaysListening, state, hasCallback: !!onEnableAlwaysListening })
+
     if (hasIntroduced && !isAlwaysListening && state === 'idle' && onEnableAlwaysListening) {
+      console.log('[FloatingInterviewer] Conditions met, starting 500ms timer')
       // Small delay after speaking ends
       const timer = setTimeout(() => {
+        console.log('[FloatingInterviewer] Timer fired, calling onEnableAlwaysListening')
         onEnableAlwaysListening()
       }, 500)
-      return () => clearTimeout(timer)
+      return () => {
+        console.log('[FloatingInterviewer] Timer cleared (effect re-ran)')
+        clearTimeout(timer)
+      }
     }
   }, [hasIntroduced, isAlwaysListening, state, onEnableAlwaysListening])
 
