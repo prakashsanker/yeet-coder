@@ -1,5 +1,5 @@
-import { llm, type LLMModel } from './llm'
-import type { QuestionData } from '../types'
+import { llm, type LLMModel } from './llm.js'
+import type { QuestionData } from '../types/index.js'
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 

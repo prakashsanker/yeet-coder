@@ -6,8 +6,8 @@
  * 3. Transcript analysis (thought process, Big O discussion, clarity)
  */
 
-import { llm, type LLMModel } from './llm'
-import type { TranscriptEntry, TestCase, EvaluationFeedback } from '../types'
+import { llm, type LLMModel } from './llm.js'
+import type { TranscriptEntry, TestCase, EvaluationFeedback } from '../types/index.js'
 
 export interface EvaluationInput {
   // Interview data

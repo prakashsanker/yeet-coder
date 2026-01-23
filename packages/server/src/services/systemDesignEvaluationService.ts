@@ -10,8 +10,8 @@
  * 7. Communication - Clear explanation?
  */
 
-import { llm, type LLMModel } from './llm'
-import type { TranscriptEntry, ExcalidrawData, ExcalidrawElement, SystemDesignFeedback } from '../types'
+import { llm, type LLMModel } from './llm.js'
+import type { TranscriptEntry, ExcalidrawData, ExcalidrawElement, SystemDesignFeedback } from '../types/index.js'
 
 export interface SystemDesignEvaluationInput {
   // Interview data

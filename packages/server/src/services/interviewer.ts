@@ -1,4 +1,4 @@
-import { generateText, generateJSON, type LLMMessage } from './llm'
+import { generateText, generateJSON, type LLMMessage } from './llm.js'
 
 interface TranscriptEntry {
   timestamp: number

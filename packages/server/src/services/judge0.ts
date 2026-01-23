@@ -1,4 +1,4 @@
-import type { TestCase, ExecutionResult } from '../types'
+import type { TestCase, ExecutionResult } from '../types/index.js'
 
 // Judge0 language IDs
 const LANGUAGE_IDS: Record<string, number> = {

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { executeCode, isConfigured } from '../services/judge0'
+import { executeCode, isConfigured } from '../services/judge0.js'
 
 const router = Router()
 

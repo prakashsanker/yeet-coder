@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import Stripe from 'stripe'
-import { supabase } from '../db/supabase'
-import { authMiddleware, AuthenticatedRequest } from '../middleware/auth'
+import { supabase } from '../db/supabase.js'
+import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js'
 
 const router = Router()
 

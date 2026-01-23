@@ -5,8 +5,8 @@ import {
   getAvailableVoices,
   isConfigured as isOpenAIConfigured,
   type OpenAIVoice,
-} from '../services/openai-voice'
-import { getInterviewerResponse, generateHint, analyzeApproach } from '../services/interviewer'
+} from '../services/openai-voice.js'
+import { getInterviewerResponse, generateHint, analyzeApproach } from '../services/interviewer.js'
 
 const router = Router()
 

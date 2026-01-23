@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
-import { supabase } from '../db/supabase'
-import { optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth'
-import { evaluationService, type EvaluationInput } from '../services/evaluationService'
-import { systemDesignEvaluationService, type SystemDesignEvaluationInput } from '../services/systemDesignEvaluationService'
-import type { Evaluation, TestCase, TranscriptEntry, Question, ExcalidrawData } from '../types'
+import { supabase } from '../db/supabase.js'
+import { optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js'
+import { evaluationService, type EvaluationInput } from '../services/evaluationService.js'
+import { systemDesignEvaluationService, type SystemDesignEvaluationInput } from '../services/systemDesignEvaluationService.js'
+import type { Evaluation, TestCase, TranscriptEntry, Question, ExcalidrawData } from '../types/index.js'
 
 const router = Router()
 

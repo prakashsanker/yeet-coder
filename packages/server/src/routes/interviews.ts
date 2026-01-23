@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
-import { supabase } from '../db/supabase'
-import { optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth'
-import type { InterviewSession, TranscriptEntry, Question } from '../types'
+import { supabase } from '../db/supabase.js'
+import { optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js'
+import type { InterviewSession, TranscriptEntry, Question } from '../types/index.js'
 
 const router = Router()
 

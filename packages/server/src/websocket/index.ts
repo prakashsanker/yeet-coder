@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { Server } from 'http'
-import { handleVoiceMessage, type VoiceSession } from './voiceHandler'
+import { handleVoiceMessage, type VoiceSession } from './voiceHandler.js'
 
 export interface InterviewWebSocket extends WebSocket {
   interviewId?: string

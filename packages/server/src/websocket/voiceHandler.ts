@@ -1,7 +1,7 @@
-import type { InterviewWebSocket, WebSocketMessage } from './index'
-import { sendMessage } from './index'
-import { getInterviewerResponse } from '../services/interviewer'
-import { textToSpeech, speechToText, isConfigured as isOpenAIConfigured } from '../services/openai-voice'
+import type { InterviewWebSocket, WebSocketMessage } from './index.js'
+import { sendMessage } from './index.js'
+import { getInterviewerResponse } from '../services/interviewer.js'
+import { textToSpeech, speechToText, isConfigured as isOpenAIConfigured } from '../services/openai-voice.js'
 
 export interface VoiceSession {
   audioChunks: string[] // base64 audio chunks

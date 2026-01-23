@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { questionGenerator, type Difficulty } from '../services/questionGenerator.js'
-import { supabase } from '../db/supabase'
+import { supabase } from '../db/supabase.js'
 
 const router = Router()
 
