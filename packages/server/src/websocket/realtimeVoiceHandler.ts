@@ -63,6 +63,12 @@ export async function handleRealtimeVoiceMessage(
       // Handle text input as fallback
       await handleTextInput(ws, message.text)
       break
+
+    case 'request_introduction':
+      // Generate introduction using Realtime API voice
+      console.log('[RealtimeHandler] Generating introduction via Realtime API...')
+      await handleIntroductionRequest(ws, message.text)
+      break
   }
 }
 
@@ -91,6 +97,10 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
 
   console.log(`[RealtimeHandler] Starting session for interview ${ws.interviewId}`)
 
+  // Get stored context from the WebSocket object
+  const storedContext = ws.interviewContext || { currentQuestion: '', userCode: '' }
+  console.log(`[RealtimeHandler] Using stored context - question length: ${storedContext.currentQuestion.length}, code length: ${storedContext.userCode.length}`)
+
   // Create event handlers that relay to the client WebSocket
   const realtimeClient = new OpenAIRealtimeClient(
     {
@@ -101,6 +111,10 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
     {
       onSessionCreated: () => {
         console.log(`[RealtimeHandler] Session created for ${ws.interviewId}`)
+        // Apply stored context to the session
+        if (storedContext.currentQuestion || storedContext.userCode) {
+          realtimeClient.updateContext(storedContext.currentQuestion, storedContext.userCode)
+        }
         sendMessage(ws, { type: 'voice_ready' })
       },
 
@@ -212,6 +226,120 @@ async function handleTextInput(ws: InterviewWebSocket, text: string): Promise<vo
 
     // Send text to Realtime API
     ws.realtimeSession.realtimeClient.sendTextMessage(text)
+  }
+}
+
+/**
+ * Handle introduction request - generate introduction audio using Realtime API voice
+ * This ensures the introduction uses the same voice as the conversation
+ */
+async function handleIntroductionRequest(ws: InterviewWebSocket, introductionText: string): Promise<void> {
+  if (!ws.interviewId) {
+    sendMessage(ws, { type: 'error', message: 'Must join interview first' })
+    return
+  }
+
+  // Check if Realtime API is configured
+  if (!OpenAIRealtimeClient.isConfigured()) {
+    sendMessage(ws, {
+      type: 'error',
+      message: 'OpenAI Realtime API not configured. Check OPENAI_API_KEY.',
+    })
+    return
+  }
+
+  // Clean up any existing session first
+  if (ws.realtimeSession) {
+    ws.realtimeSession.cleanup()
+  }
+
+  console.log(`[RealtimeHandler] Generating introduction for interview ${ws.interviewId}`)
+
+  // Create a temporary Realtime client for the introduction
+  const realtimeClient = new OpenAIRealtimeClient(
+    {
+      voice: 'ash', // Same voice as conversation
+      turnDetection: 'none', // No VAD needed for introduction
+      temperature: 0.6,
+    },
+    {
+      onSessionCreated: () => {
+        console.log(`[RealtimeHandler] Introduction session created`)
+        // Now speak the introduction text
+        realtimeClient.speakText(introductionText)
+      },
+
+      onResponseAudioDelta: (delta, _itemId) => {
+        // Accumulate audio
+        if (ws.realtimeSession) {
+          ws.realtimeSession.audioResponseBuffer.push(delta)
+        }
+      },
+
+      onResponseTextDelta: (delta, _itemId) => {
+        // Accumulate transcript (though for intro we already know the text)
+        if (ws.realtimeSession) {
+          ws.realtimeSession.currentTranscript += delta
+        }
+      },
+
+      onResponseDone: () => {
+        console.log(`[RealtimeHandler] Introduction audio generated`)
+
+        // Send the introduction response with audio
+        const audioBuffer = ws.realtimeSession?.audioResponseBuffer || []
+        const combinedAudio = audioBuffer.length > 0 ? audioBuffer.join('') : undefined
+
+        sendMessage(ws, {
+          type: 'introduction_ready',
+          text: introductionText,
+          audio: combinedAudio,
+        })
+
+        // Reset buffers
+        if (ws.realtimeSession) {
+          ws.realtimeSession.audioResponseBuffer = []
+          ws.realtimeSession.currentTranscript = ''
+        }
+      },
+
+      onError: (error) => {
+        console.error(`[RealtimeHandler] Introduction error:`, error)
+        sendMessage(ws, {
+          type: 'error',
+          message: `Failed to generate introduction: ${error.message}`,
+        })
+      },
+
+      onClose: () => {
+        console.log(`[RealtimeHandler] Introduction session closed`)
+      },
+    }
+  )
+
+  // Create session object
+  ws.realtimeSession = {
+    realtimeClient,
+    interviewId: ws.interviewId,
+    isActive: true,
+    audioResponseBuffer: [],
+    currentTranscript: '',
+    cleanup: () => {
+      realtimeClient.disconnect()
+      ws.realtimeSession = undefined
+    },
+  }
+
+  // Connect and generate introduction
+  try {
+    await realtimeClient.connect()
+  } catch (error) {
+    console.error(`[RealtimeHandler] Failed to connect for introduction:`, error)
+    sendMessage(ws, {
+      type: 'error',
+      message: 'Failed to connect to Realtime API for introduction',
+    })
+    ws.realtimeSession.cleanup()
   }
 }
 

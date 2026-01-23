@@ -21,6 +21,11 @@ export interface InterviewWebSocket extends WebSocket {
   interviewId?: string
   voiceSession?: VoiceSession // Traditional pipeline session
   realtimeSession?: RealtimeVoiceSession // Realtime API session
+  // Store context independently so it persists across session recreations
+  interviewContext?: {
+    currentQuestion: string
+    userCode: string
+  }
 }
 
 export type WebSocketMessage =
@@ -31,11 +36,13 @@ export type WebSocketMessage =
   | { type: 'voice_start' }
   | { type: 'voice_stop' }
   | { type: 'text_input'; text: string } // For text-based fallback
+  | { type: 'request_introduction'; text: string } // Request intro using Realtime API voice
 
 export type WebSocketResponse =
   | { type: 'joined'; interview_id: string }
   | { type: 'transcript'; text: string; is_final: boolean }
   | { type: 'interviewer_response'; text: string; audio?: string } // audio is base64
+  | { type: 'introduction_ready'; text: string; audio?: string } // intro with Realtime API voice
   | { type: 'interview_state'; state: unknown }
   | { type: 'error'; message: string }
   | { type: 'voice_ready' }
@@ -98,8 +105,19 @@ async function handleMessage(ws: InterviewWebSocket, message: WebSocketMessage):
       }
       break
 
+    case 'request_introduction':
+      // Always use Realtime API for introductions to ensure voice consistency
+      console.log(`[WebSocket] Received request_introduction, routing to realtime handler`)
+      await handleRealtimeVoiceMessage(ws, message)
+      break
+
     case 'code_update':
-      // Update code context for the AI interviewer
+      // Store context on WebSocket object (persists across session recreations)
+      if (!ws.interviewContext) {
+        ws.interviewContext = { currentQuestion: '', userCode: '' }
+      }
+      ws.interviewContext.userCode = message.code
+      // Also update active session if it exists
       if (VOICE_MODE === 'realtime' && ws.realtimeSession) {
         updateRealtimeContext(ws, { userCode: message.code })
       } else if (ws.voiceSession) {
@@ -108,7 +126,12 @@ async function handleMessage(ws: InterviewWebSocket, message: WebSocketMessage):
       break
 
     case 'question_update':
-      // Update the current problem context
+      // Store context on WebSocket object (persists across session recreations)
+      if (!ws.interviewContext) {
+        ws.interviewContext = { currentQuestion: '', userCode: '' }
+      }
+      ws.interviewContext.currentQuestion = message.question
+      // Also update active session if it exists
       if (VOICE_MODE === 'realtime' && ws.realtimeSession) {
         updateRealtimeContext(ws, { currentQuestion: message.question })
       } else if (ws.voiceSession) {

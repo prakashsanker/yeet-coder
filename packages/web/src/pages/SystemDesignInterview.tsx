@@ -52,13 +52,15 @@ export default function SystemDesignInterview() {
     return `${q.title}\n\n${q.description}`
   }, [interview])
 
-  // Voice interaction hook
+  // Voice interaction hook - using Realtime API for low-latency
   const {
     voiceState,
     currentTranscript,
+    isConnected: isWsConnected,
+    isGeneratingIntro,
     startListening,
     stopListening,
-    playCachedIntroduction,
+    playRealtimeIntroduction,
     isAlwaysListening,
     isSpeechDetected,
     enableAlwaysListening,
@@ -180,52 +182,76 @@ export default function SystemDesignInterview() {
     }
   }, [interviewIdParam, interview, elements, notes, timeSpentMs])
 
-  // Pre-cache introduction when question is loaded (skip for resumed sessions)
+  // Generate and play introduction using Realtime API voice (same as conversation)
+  // This is triggered when WebSocket connects and question is loaded
   useEffect(() => {
-    // Skip preloading if intro was already played or this is a resumed session
+    // Skip if intro was already played or this is a resumed session
     if (hasIntroduced || isResumedSession) {
       return
     }
 
-    if (interview?.question && questionContext && !cachedIntro && !isPreloading) {
-      setIsPreloading(true)
-      fetch(`/api/voice/introduce`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          current_question: questionContext,
-          include_audio: true,
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            setCachedIntro({ text: data.text, audio: data.audio })
-            console.log('[PRELOAD] System design introduction cached successfully')
-          }
-        })
-        .catch((err) => {
-          console.error('[PRELOAD] Failed to cache introduction:', err)
-        })
-        .finally(() => {
-          setIsPreloading(false)
-        })
+    // Need WebSocket connection and question data
+    if (!isWsConnected || !interview?.question || !questionContext) {
+      return
     }
-  }, [interview, questionContext, cachedIntro, isPreloading, hasIntroduced, isResumedSession])
 
-  // Auto-play intro when cached and ready
+    // Already generating or have cached intro
+    if (isPreloading || isGeneratingIntro || cachedIntro) {
+      return
+    }
+
+    // First, generate the introduction text via REST API (fast, text-only)
+    // Then generate audio via Realtime API WebSocket for voice consistency
+    console.log('[INTRO] Generating system design introduction text...')
+    setIsPreloading(true)
+
+    fetch(`/api/voice/introduce`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_question: questionContext,
+        include_audio: false, // Don't use TTS - we'll use Realtime API for audio
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error ${res.status}: ${res.statusText}`)
+        }
+        return res.json()
+      })
+      .then((data) => {
+        if (data.success && data.text) {
+          console.log('[INTRO] Got introduction text, generating audio via Realtime API...')
+          // Store the text, audio will be generated via Realtime API
+          setCachedIntro({ text: data.text })
+        } else {
+          console.error('[INTRO] API returned unsuccessful response:', data)
+        }
+      })
+      .catch((err) => {
+        console.error('[INTRO] Failed to generate introduction text:', err)
+      })
+      .finally(() => {
+        setIsPreloading(false)
+      })
+  }, [interview, questionContext, isWsConnected, cachedIntro, isPreloading, isGeneratingIntro, hasIntroduced, isResumedSession])
+
+  // Play intro when text is ready - use Realtime API for audio
   useEffect(() => {
-    if (cachedIntro && !hasIntroduced && interview?.question && !isResumedSession) {
+    if (cachedIntro && !hasIntroduced && interview?.question && !isResumedSession && isWsConnected) {
       setHasIntroduced(true)
       // Persist to localStorage so refresh doesn't replay intro
       if (interviewIdParam) {
         localStorage.setItem(`intro_played_${interviewIdParam}`, 'true')
       }
+
+      // Use Realtime API to generate and play audio (same voice as conversation)
       setTimeout(() => {
-        playCachedIntroduction(cachedIntro)
+        console.log('[INTRO] Playing introduction with Realtime API voice...')
+        playRealtimeIntroduction(cachedIntro.text)
       }, 500)
     }
-  }, [cachedIntro, hasIntroduced, interview, playCachedIntroduction, interviewIdParam, isResumedSession])
+  }, [cachedIntro, hasIntroduced, interview, playRealtimeIntroduction, interviewIdParam, isResumedSession, isWsConnected])
 
   // Handle drawing changes
   const handleExcalidrawChange = useCallback((newElements: readonly unknown[]) => {
@@ -334,13 +360,15 @@ export default function SystemDesignInterview() {
     )
   }
 
-  // Waiting for intro to cache (skip for resumed sessions)
-  if (!cachedIntro && isPreloading && !isResumedSession && !hasIntroduced) {
+  // Waiting for intro to generate (skip for resumed sessions)
+  if (!cachedIntro && (isPreloading || isGeneratingIntro || !isWsConnected) && !isResumedSession && !hasIntroduced) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p>Preparing AI interviewer...</p>
+          <p>
+            {!isWsConnected ? 'Connecting to voice service...' : isGeneratingIntro ? 'Generating introduction...' : 'Preparing AI interviewer...'}
+          </p>
         </div>
       </div>
     )
@@ -412,20 +440,6 @@ export default function SystemDesignInterview() {
           <div className="prose prose-invert prose-sm max-w-none">
             <div className="whitespace-pre-wrap text-gray-300">{question?.description}</div>
           </div>
-          {(() => {
-            const keyConsiderations = question?.metadata?.key_considerations
-            if (!keyConsiderations || !Array.isArray(keyConsiderations)) return null
-            return (
-              <div className="mt-6">
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">Key Considerations</h3>
-                <ul className="list-disc list-inside text-sm text-gray-300 space-y-1">
-                  {keyConsiderations.map((consideration, i) => (
-                    <li key={i}>{String(consideration)}</li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })()}
         </div>
 
         {/* Center panel: Excalidraw */}

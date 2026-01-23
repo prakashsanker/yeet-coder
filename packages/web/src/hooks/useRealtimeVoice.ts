@@ -37,6 +37,7 @@ type WebSocketMessage =
   | { type: 'joined'; interview_id: string }
   | { type: 'transcript'; text: string; is_final: boolean }
   | { type: 'interviewer_response'; text: string; audio?: string }
+  | { type: 'introduction_ready'; text: string; audio?: string }
   | { type: 'voice_ready' }
   | { type: 'error'; message: string }
 
@@ -92,7 +93,7 @@ export function useRealtimeVoice({
   onTranscriptUpdate,
   onInterviewerResponse,
 }: UseRealtimeVoiceOptions) {
-  console.log('[RealtimeVoice] Hook initialized - this is the REALTIME API hook, NOT the pipeline hook')
+  // Note: This is the REALTIME API hook, NOT the pipeline hook
   const [voiceState, setVoiceState] = useState<VoiceState>('idle')
   const [currentTranscript, setCurrentTranscript] = useState<string>('')
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
@@ -101,6 +102,9 @@ export function useRealtimeVoice({
   const [isListening, setIsListening] = useState(false)
   // For compatibility with useVoiceInteraction API
   const [isSpeechDetected, setIsSpeechDetected] = useState(false)
+  // Track pending intro request
+  const [isGeneratingIntro, setIsGeneratingIntro] = useState(false)
+  const pendingIntroCallbackRef = useRef<((intro: { text: string; audio?: string }) => void) | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -205,6 +209,18 @@ export function useRealtimeVoice({
             playPCM16Audio(message.audio)
           } else {
             setVoiceState('idle')
+          }
+          break
+
+        case 'introduction_ready':
+          // Introduction audio generated via Realtime API
+          console.log('[RealtimeVoice] Introduction ready via Realtime API')
+          setIsGeneratingIntro(false)
+
+          // Call the pending callback if there is one
+          if (pendingIntroCallbackRef.current) {
+            pendingIntroCallbackRef.current({ text: message.text, audio: message.audio })
+            pendingIntroCallbackRef.current = null
           }
           break
 
@@ -317,6 +333,91 @@ export function useRealtimeVoice({
       }
     },
     [onTranscriptUpdate, onInterviewerResponse, playMP3Audio]
+  )
+
+  // Request introduction via Realtime API (same voice as conversation)
+  const requestIntroduction = useCallback(
+    (introductionText: string): Promise<{ text: string; audio?: string }> => {
+      return new Promise((resolve, reject) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          reject(new Error('WebSocket not connected'))
+          return
+        }
+
+        console.log('[RealtimeVoice] Requesting introduction via Realtime API')
+        setIsGeneratingIntro(true)
+
+        // Store callback to be called when intro is ready
+        pendingIntroCallbackRef.current = (intro) => {
+          resolve(intro)
+        }
+
+        // Set a timeout in case the intro generation fails
+        const timeout = setTimeout(() => {
+          if (pendingIntroCallbackRef.current) {
+            pendingIntroCallbackRef.current = null
+            setIsGeneratingIntro(false)
+            reject(new Error('Introduction generation timed out'))
+          }
+        }, 30000) // 30 second timeout
+
+        // Update the stored callback to clear timeout on success
+        const originalCallback = pendingIntroCallbackRef.current
+        pendingIntroCallbackRef.current = (intro) => {
+          clearTimeout(timeout)
+          originalCallback(intro)
+        }
+
+        // Send request to server
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'request_introduction',
+            text: introductionText,
+          })
+        )
+      })
+    },
+    []
+  )
+
+  // Play introduction using Realtime API voice (ensures voice consistency)
+  const playRealtimeIntroduction = useCallback(
+    async (introductionText: string) => {
+      console.log('[RealtimeVoice] Generating and playing introduction with Realtime API voice')
+
+      // Set state to 'speaking' immediately to prevent auto-listening from starting
+      // while we're generating the introduction
+      setVoiceState('speaking')
+
+      try {
+        const intro = await requestIntroduction(introductionText)
+
+        // Add to transcript
+        const introEntry: TranscriptEntry = {
+          timestamp: Date.now(),
+          speaker: 'interviewer',
+          text: intro.text,
+        }
+        setTranscript((prev) => {
+          const updated = [...prev, introEntry]
+          onTranscriptUpdate?.(updated)
+          return updated
+        })
+        onInterviewerResponse?.(intro.text)
+
+        // Play audio (PCM16 from Realtime API)
+        if (intro.audio) {
+          await playPCM16Audio(intro.audio)
+        } else {
+          setVoiceState('idle')
+        }
+      } catch (err) {
+        console.error('[RealtimeVoice] Failed to generate introduction:', err)
+        setError('Failed to generate introduction')
+        setVoiceState('idle')
+      }
+    },
+    [requestIntroduction, onTranscriptUpdate, onInterviewerResponse, playPCM16Audio]
   )
 
   // Send audio chunk to server
@@ -492,6 +593,31 @@ export function useRealtimeVoice({
     [onTranscriptUpdate]
   )
 
+  // Send context when WebSocket connects (in case values were set before connection)
+  useEffect(() => {
+    if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+
+    console.log('[RealtimeVoice] Connection established, sending initial context')
+
+    if (currentQuestion) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'question_update',
+          question: currentQuestion,
+        })
+      )
+    }
+
+    if (userCode) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'code_update',
+          code: userCode,
+        })
+      )
+    }
+  }, [isConnected]) // Only run when connection state changes
+
   // Update context when question/code changes
   useEffect(() => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
@@ -545,10 +671,13 @@ export function useRealtimeVoice({
     isConnected,
     error,
     isListening,
+    isGeneratingIntro,
     startListening,
     stopListening,
     sendTextInput,
     playCachedIntroduction,
+    playRealtimeIntroduction,
+    requestIntroduction,
     // Compatibility with useVoiceInteraction
     isAlwaysListening,
     isSpeechDetected,
