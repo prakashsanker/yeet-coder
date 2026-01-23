@@ -1,16 +1,33 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { Server } from 'http'
 import { handleVoiceMessage, type VoiceSession } from './voiceHandler.js'
+import {
+  handleRealtimeVoiceMessage,
+  cleanupRealtimeSession,
+  updateRealtimeContext,
+  type RealtimeVoiceSession,
+} from './realtimeVoiceHandler.js'
+
+// Voice mode configuration
+// 'realtime' = OpenAI Realtime API (low-latency, speech-to-speech)
+// 'pipeline' = Traditional pipeline (STT -> LLM -> TTS)
+export type VoiceMode = 'realtime' | 'pipeline'
+
+const VOICE_MODE: VoiceMode = (process.env.VOICE_MODE as VoiceMode) || 'pipeline'
+
+console.log(`[WebSocket] Voice mode: ${VOICE_MODE}`)
 
 export interface InterviewWebSocket extends WebSocket {
   interviewId?: string
-  voiceSession?: VoiceSession
+  voiceSession?: VoiceSession // Traditional pipeline session
+  realtimeSession?: RealtimeVoiceSession // Realtime API session
 }
 
 export type WebSocketMessage =
   | { type: 'join_interview'; interview_id: string }
   | { type: 'audio_chunk'; data: string } // base64 encoded audio
   | { type: 'code_update'; code: string }
+  | { type: 'question_update'; question: string } // Update current problem
   | { type: 'voice_start' }
   | { type: 'voice_stop' }
   | { type: 'text_input'; text: string } // For text-based fallback
@@ -44,8 +61,12 @@ export function setupWebSocket(server: Server): WebSocketServer {
 
     ws.on('close', () => {
       console.log('WebSocket client disconnected')
+      // Clean up based on voice mode
       if (ws.voiceSession) {
         ws.voiceSession.cleanup()
+      }
+      if (ws.realtimeSession) {
+        cleanupRealtimeSession(ws)
       }
     })
 
@@ -68,12 +89,31 @@ async function handleMessage(ws: InterviewWebSocket, message: WebSocketMessage):
     case 'voice_start':
     case 'voice_stop':
     case 'text_input':
-      await handleVoiceMessage(ws, message)
+      // Route to appropriate handler based on voice mode
+      console.log(`[WebSocket] Received ${message.type}, routing to ${VOICE_MODE} handler`)
+      if (VOICE_MODE === 'realtime') {
+        await handleRealtimeVoiceMessage(ws, message)
+      } else {
+        await handleVoiceMessage(ws, message)
+      }
       break
 
     case 'code_update':
-      // Store code update for interview session
-      // Will be implemented in Phase 6
+      // Update code context for the AI interviewer
+      if (VOICE_MODE === 'realtime' && ws.realtimeSession) {
+        updateRealtimeContext(ws, { userCode: message.code })
+      } else if (ws.voiceSession) {
+        ws.voiceSession.interviewContext.userCode = message.code
+      }
+      break
+
+    case 'question_update':
+      // Update the current problem context
+      if (VOICE_MODE === 'realtime' && ws.realtimeSession) {
+        updateRealtimeContext(ws, { currentQuestion: message.question })
+      } else if (ws.voiceSession) {
+        ws.voiceSession.interviewContext.currentQuestion = message.question
+      }
       break
 
     default:

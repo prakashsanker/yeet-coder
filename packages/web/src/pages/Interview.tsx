@@ -6,7 +6,8 @@ import CodeEditor from '@/components/interview/CodeEditor'
 import TestCasesPanel, { type TestResult } from '@/components/interview/TestCasesPanel'
 import InterviewTimer from '@/components/interview/InterviewTimer'
 import FloatingInterviewer from '@/components/interview/FloatingInterviewer'
-import { useVoiceInteraction } from '@/hooks/useVoiceInteraction'
+import { useRealtimeVoice } from '@/hooks/useRealtimeVoice'
+console.log('🚀 Interview.tsx loaded - using useRealtimeVoice (Realtime API)')
 import { useInterviewStore } from '@/store/interviewStore'
 import type { QuestionData, TranscriptEntry } from '@/types'
 import type { SupportedLanguage } from '@/hooks/useCodeEditor'
@@ -98,7 +99,7 @@ export default function Interview() {
     return `${questionData.title}\n\n${questionData.description}\n\nConstraints:\n${questionData.constraints.join('\n')}`
   }, [questionData])
 
-  // Voice interaction hook
+  // Voice interaction hook - using Realtime API for low-latency
   const {
     voiceState,
     currentTranscript,
@@ -109,7 +110,7 @@ export default function Interview() {
     isSpeechDetected,
     enableAlwaysListening,
     disableAlwaysListening,
-  } = useVoiceInteraction({
+  } = useRealtimeVoice({
     interviewId: interviewId || interviewIdParam || '',
     currentQuestion: questionContext,
     userCode: code,
