@@ -220,16 +220,16 @@ Make sure every test case has a correct expected_output that you have verified.`
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`  Using Claude Opus 4.5 for generation... (attempt ${attempt}/${MAX_RETRIES})`)
+      console.log(`  Using Llama 3.3 70B via Groq... (attempt ${attempt}/${MAX_RETRIES})`)
       const result = await llm.generateJSON<GeneratedTestCases>(
         [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
         ],
         {
-          model: 'anthropic/claude-opus-4',  // Claude Opus 4.5 via OpenRouter
+          model: 'llama-3.3-70b-versatile',  // Llama 3.3 70B via Groq (free)
           temperature: 0.2,
-          maxTokens: 8000  // Allow for large test cases
+          maxTokens: 8000  // Groq has generous limits
         }
       )
 
@@ -275,16 +275,16 @@ async function main() {
   const idArg = args.find((a) => a.startsWith('--id='))
   const specificId = idArg ? idArg.split('=')[1] : undefined
 
-  console.log('=== Test Case Generator (Claude Opus 4.5) ===')
+  console.log('=== Test Case Generator (Llama 3.3 70B via Groq) ===')
   console.log(`Mode: ${dryRun ? 'DRY RUN' : 'LIVE'}`)
   if (limit) console.log(`Limit: ${limit}`)
   if (specificId) console.log(`Specific ID: ${specificId}`)
   console.log('')
 
-  // Check for OpenRouter API key
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.error('ERROR: OPENROUTER_API_KEY is not set')
-    console.error('Please set OPENROUTER_API_KEY in your .env file to use Claude Opus 4.5')
+  // Check for Groq API key
+  if (!process.env.GROQ_API_KEY) {
+    console.error('ERROR: GROQ_API_KEY is not set')
+    console.error('Please set GROQ_API_KEY in your .env file to use Llama 3.3 70B')
     process.exit(1)
   }
 
