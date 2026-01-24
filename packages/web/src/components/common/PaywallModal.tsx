@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { analytics } from '../../lib/posthog'
 
 interface PaywallModalProps {
   isOpen: boolean
@@ -19,9 +20,17 @@ export default function PaywallModal({
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
 
+  // Track paywall shown
+  useEffect(() => {
+    if (isOpen) {
+      analytics.paywallShown()
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const handleUpgrade = async () => {
+    analytics.upgradeClicked()
     setIsLoading(true)
     try {
       const { url } = await api.subscription.createCheckout()

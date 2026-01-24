@@ -4,6 +4,7 @@ import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
 import { api, type Question, type Evaluation, type InterviewSession, type Topic } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { analytics } from '../lib/posthog'
 
 type Tab = 'neetcode' | 'system_design' | 'history'
 
@@ -65,6 +66,7 @@ export default function Dashboard() {
   // Handle upgrade success query param
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {
+      analytics.upgradeSuccessful()
       setShowUpgradeSuccess(true)
       // Clear the query param
       setSearchParams({}, { replace: true })
@@ -84,6 +86,8 @@ export default function Dashboard() {
       try {
         const { subscription } = await api.subscription.getStatus()
         setSubscription(subscription)
+        // Track dashboard view with subscription tier
+        analytics.dashboardViewed(subscription.tier)
       } catch (err) {
         console.error('Failed to load subscription:', err)
       }
