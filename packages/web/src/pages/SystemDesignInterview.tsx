@@ -5,7 +5,7 @@ import '@excalidraw/excalidraw/index.css'
 import FloatingInterviewer from '@/components/interview/FloatingInterviewer'
 import AppHeader from '@/components/common/AppHeader'
 import { useRealtimeVoice } from '@/hooks/useRealtimeVoice'
-import { api, type InterviewSession, type TranscriptEntry } from '@/lib/api'
+import { api, API_URL, type InterviewSession, type TranscriptEntry } from '@/lib/api'
 
 export default function SystemDesignInterview() {
   const navigate = useNavigate()
@@ -205,7 +205,7 @@ export default function SystemDesignInterview() {
     console.log('[INTRO] Generating system design introduction text...')
     setIsPreloading(true)
 
-    fetch(`/api/voice/introduce`, {
+    fetch(`${API_URL}/api/voice/introduce`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

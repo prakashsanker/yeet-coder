@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { QuestionData, TranscriptEntry, InterviewSession } from '@/types'
-import { getAuthHeaders } from '@/lib/api'
+import { getAuthHeaders, API_URL } from '@/lib/api'
 
 export type InterviewStatus = 'idle' | 'loading' | 'ready' | 'in_progress' | 'submitting' | 'completed' | 'abandoned'
 
@@ -93,7 +93,7 @@ export const useInterviewStore = create<InterviewStore>()(
 
           try {
             const authHeaders = await getAuthHeaders()
-            const response = await fetch('/api/interviews', {
+            const response = await fetch(`${API_URL}/api/interviews', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify({
@@ -153,7 +153,7 @@ export const useInterviewStore = create<InterviewStore>()(
 
           try {
             const authHeaders = await getAuthHeaders()
-            const response = await fetch(`/api/interviews/${id}`, {
+            const response = await fetch(`${API_URL}/api/interviews/${id}`, {
               headers: authHeaders,
             })
             if (!response.ok) {
@@ -216,7 +216,7 @@ export const useInterviewStore = create<InterviewStore>()(
 
           try {
             const authHeaders = await getAuthHeaders()
-            await fetch(`/api/interviews/${interviewId}`, {
+            await fetch(`${API_URL}/api/interviews/${interviewId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify({
@@ -241,7 +241,7 @@ export const useInterviewStore = create<InterviewStore>()(
             (async () => {
               try {
                 const authHeaders = await getAuthHeaders()
-                await fetch(`/api/interviews/${interviewId}`, {
+                await fetch(`${API_URL}/api/interviews/${interviewId}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json', ...authHeaders },
                   body: JSON.stringify({
@@ -263,7 +263,7 @@ export const useInterviewStore = create<InterviewStore>()(
           try {
             if (interviewId && !interviewId.startsWith('temp-') && !interviewId.startsWith('local-')) {
               const authHeaders = await getAuthHeaders()
-              await fetch(`/api/interviews/${interviewId}/submit`, {
+              await fetch(`${API_URL}/api/interviews/${interviewId}/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify({
@@ -293,7 +293,7 @@ export const useInterviewStore = create<InterviewStore>()(
           try {
             if (interviewId && !interviewId.startsWith('temp-') && !interviewId.startsWith('local-')) {
               const authHeaders = await getAuthHeaders()
-              await fetch(`/api/interviews/${interviewId}/end`, {
+              await fetch(`${API_URL}/api/interviews/${interviewId}/end`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify({

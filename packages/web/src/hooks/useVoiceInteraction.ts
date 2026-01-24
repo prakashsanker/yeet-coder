@@ -1,9 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { VoiceState } from '@/components/interview/VoiceAvatar'
 
-// Use relative URLs - WebSocket URL is derived from current page location
+// Derive WebSocket URL from environment or current page location
 const getWsUrl = () => {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL
+  // If API URL is set (production), derive WS URL from it
+  if (import.meta.env.VITE_API_URL) {
+    const apiUrl = import.meta.env.VITE_API_URL as string
+    return apiUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:')
+  }
+  // Default to current page's host (for local development with Vite proxy)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${window.location.host}`
 }
