@@ -1,7 +1,8 @@
 import { supabase } from './supabase'
 
 // Use relative URLs by default so requests go through Vite's proxy
-const API_URL = import.meta.env.VITE_API_URL || ''
+// In production, VITE_API_URL should be set to the API server URL (e.g., https://api.yeetcoder.com)
+export const API_URL = import.meta.env.VITE_API_URL || ''
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   try {

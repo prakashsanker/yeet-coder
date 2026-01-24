@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
+import { API_URL } from '../lib/api'
 
 interface TestResults {
   visible: { passed: number; total: number }
@@ -109,7 +110,7 @@ export default function Evaluation() {
       }
 
       try {
-        const response = await fetch(`/api/evaluations/${id}`)
+        const response = await fetch(`${API_URL}/api/evaluations/${id}`)
         const data = await response.json()
 
         if (!response.ok) {

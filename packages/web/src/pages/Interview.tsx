@@ -11,7 +11,7 @@ console.log('🚀 Interview.tsx loaded - using useRealtimeVoice (Realtime API)')
 import { useInterviewStore } from '@/store/interviewStore'
 import type { QuestionData, TranscriptEntry } from '@/types'
 import type { SupportedLanguage } from '@/hooks/useCodeEditor'
-import { api, type Question, type InterviewSession } from '@/lib/api'
+import { api, API_URL, type Question, type InterviewSession } from '@/lib/api'
 
 type StarterCodeLanguage = keyof QuestionData['starter_code']
 
@@ -256,7 +256,7 @@ export default function Interview() {
     console.log('[INTRO] Generating introduction text...')
     setIsPreloading(true)
 
-    fetch(`/api/voice/introduce`, {
+    fetch(`${API_URL}/api/voice/introduce`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -359,7 +359,7 @@ export default function Interview() {
     }
 
     try {
-      const response = await fetch('/api/execute', {
+      const response = await fetch(`${API_URL}/api/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -448,7 +448,7 @@ export default function Interview() {
         return
       }
 
-      const response = await fetch('/api/execute', {
+      const response = await fetch(`${API_URL}/api/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
