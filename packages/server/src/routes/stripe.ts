@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import Stripe from 'stripe'
 import { supabase } from '../db/supabase.js'
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js'
+import { serverAnalytics } from '../lib/posthog.js'
 
 const router = Router()
 
@@ -266,6 +267,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
           console.error('Error upgrading user to pro:', error)
         } else {
           console.log(`[STRIPE] Upgraded user ${userId} to pro tier`)
+          // Track payment completed
+          serverAnalytics.paymentCompleted(userId, customerId, session.customer_email || undefined)
         }
         break
       }
@@ -284,6 +287,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
           console.error('Error downgrading user to free:', error)
         } else {
           console.log(`[STRIPE] Downgraded customer ${customerId} to free tier`)
+          // Track subscription cancelled
+          serverAnalytics.subscriptionCancelled(customerId, subscription.id)
         }
         break
       }

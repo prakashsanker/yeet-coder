@@ -10,6 +10,7 @@ import Evaluation from './pages/Evaluation'
 import Subscription from './pages/Subscription'
 import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
+import { analytics } from './lib/posthog'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -38,6 +39,8 @@ function AuthCallback() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
+        // Track user authentication
+        analytics.userAuthenticated(session.user.id, session.user.email)
         setIsProcessing(false)
       } else {
         // Give it a moment to process the URL hash

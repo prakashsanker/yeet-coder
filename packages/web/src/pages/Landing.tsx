@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { analytics } from '../lib/posthog'
 
 const testimonials = [
   {
@@ -45,6 +46,7 @@ export default function Landing() {
       navigate('/dashboard')
     } else {
       // Need to authenticate first - will redirect to /dashboard after callback
+      analytics.signupInitiated()
       try {
         await signInWithGoogle()
       } catch (error) {

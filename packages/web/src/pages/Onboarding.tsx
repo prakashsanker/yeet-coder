@@ -4,6 +4,7 @@ import { api, ApiError, type Topic, type Question } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
+import { analytics } from '../lib/posthog'
 
 type InterviewType = 'leetcode' | 'system_design' | null
 type Step = 'type' | 'topic' | 'question' | 'confirm'
@@ -126,12 +127,18 @@ export default function Onboarding() {
     setIsStarting(true)
     setError(null)
 
+    // Track interview start clicked
+    analytics.interviewStartClicked(selectedQuestion.id, interviewType || 'leetcode')
+
     try {
       // Create interview session first
       const { interview } = await api.interviews.create({
         question_id: selectedQuestion.id,
         language: interviewType === 'leetcode' ? 'python' : undefined,
       })
+
+      // Track interview created
+      analytics.interviewCreated(interview.id, interview.session_type)
 
       // Navigate to the correct interview page based on session type
       if (interview.session_type === 'system_design') {
@@ -144,6 +151,7 @@ export default function Onboarding() {
 
       // Check if this is a free tier limit error
       if (err instanceof ApiError && err.code === 'free_tier_limit') {
+        analytics.freeTierLimitHit()
         const existingInterviewData = err.data?.existingInterview as {
           id: string
           session_type: 'coding' | 'system_design'
@@ -204,7 +212,10 @@ export default function Onboarding() {
             <div className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto">
               {/* LeetCode */}
               <button
-                onClick={() => setInterviewType('leetcode')}
+                onClick={() => {
+                  setInterviewType('leetcode')
+                  analytics.interviewTypeSelected('leetcode')
+                }}
                 className="text-left p-6 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-xl transition-all border-2 border-transparent hover:border-brand-orange/50 group"
               >
                 <div className="w-14 h-14 bg-brand-orange/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-brand-orange/20 transition-colors">
@@ -218,7 +229,10 @@ export default function Onboarding() {
 
               {/* System Design */}
               <button
-                onClick={() => setInterviewType('system_design')}
+                onClick={() => {
+                  setInterviewType('system_design')
+                  analytics.interviewTypeSelected('system_design')
+                }}
                 className="text-left p-6 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-xl transition-all border-2 border-transparent hover:border-lc-teal/50 group"
               >
                 <div className="w-14 h-14 bg-lc-teal/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-lc-teal/20 transition-colors">
@@ -258,7 +272,10 @@ export default function Onboarding() {
                 {topics.map((topic, index) => (
                   <button
                     key={topic.id}
-                    onClick={() => setSelectedTopic(topic)}
+                    onClick={() => {
+                      setSelectedTopic(topic)
+                      analytics.topicSelected(topic.id, topic.name)
+                    }}
                     className="w-full text-left p-4 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-lg transition-all border border-transparent hover:border-brand-orange/30 group"
                   >
                     <div className="flex items-center gap-4">
@@ -315,7 +332,10 @@ export default function Onboarding() {
                 {questions.map((question) => (
                   <button
                     key={question.id}
-                    onClick={() => setSelectedQuestion(question)}
+                    onClick={() => {
+                      setSelectedQuestion(question)
+                      analytics.questionSelected(question.id, question.title, question.difficulty)
+                    }}
                     className="w-full text-left p-4 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-lg transition-all border border-transparent hover:border-brand-orange/30 group"
                   >
                     <div className="flex items-center gap-4">
