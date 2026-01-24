@@ -93,7 +93,7 @@ export const useInterviewStore = create<InterviewStore>()(
 
           try {
             const authHeaders = await getAuthHeaders()
-            const response = await fetch(`${API_URL}/api/interviews', {
+            const response = await fetch(`${API_URL}/api/interviews`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify({
