@@ -43,41 +43,41 @@ export default function SystemDesignSelectModal({ isOpen, onClose, onSelect }: S
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'text-lc-green bg-lc-green/10'
-      case 'medium': return 'text-lc-yellow bg-lc-yellow/10'
-      case 'hard': return 'text-lc-red bg-lc-red/10'
-      default: return 'text-lc-text-muted bg-lc-bg-layer-2'
+      case 'easy': return 'difficulty-easy'
+      case 'medium': return 'difficulty-medium'
+      case 'hard': return 'difficulty-hard'
+      default: return 'badge-neutral'
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-lc-bg-layer-1 rounded-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col border border-lc-border">
+    <div className="fixed inset-0 bg-[rgba(0,0,0,0.5)] backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="card w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-lc-border">
+        <div className="flex items-center justify-between p-4 border-b border-[rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-3">
             {selectedQuestion && (
               <button
                 onClick={handleBack}
-                className="text-lc-text-muted hover:text-lc-text-primary transition-colors"
+                className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
             )}
-            <div className="w-8 h-8 bg-lc-teal/10 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-lc-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 bg-[#F3E5F5] rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-[var(--accent-purple)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-lc-text-primary">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               {selectedQuestion ? selectedQuestion.title : 'System Design Questions'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-lc-text-muted hover:text-lc-text-primary transition-colors"
+            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -89,13 +89,13 @@ export default function SystemDesignSelectModal({ isOpen, onClose, onSelect }: S
         <div className="flex-1 overflow-y-auto p-4">
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lc-teal"></div>
+              <div className="spinner w-8 h-8"></div>
             </div>
           )}
 
           {error && (
             <div className="flex items-center justify-center py-12">
-              <p className="text-lc-red">{error}</p>
+              <p className="text-[#C62828]">{error}</p>
             </div>
           )}
 
@@ -104,7 +104,7 @@ export default function SystemDesignSelectModal({ isOpen, onClose, onSelect }: S
             <div className="space-y-4">
               {questions.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-lc-text-muted">No system design questions available yet.</p>
+                  <p className="text-[var(--text-muted)]">No system design questions available yet.</p>
                 </div>
               ) : (
                 <div className="grid gap-2">
@@ -112,21 +112,21 @@ export default function SystemDesignSelectModal({ isOpen, onClose, onSelect }: S
                     <button
                       key={question.id}
                       onClick={() => handleQuestionClick(question)}
-                      className="w-full text-left p-4 bg-lc-bg-layer-2 hover:bg-lc-bg-layer-3 rounded-lg transition-all border border-transparent hover:border-lc-teal/30 group"
+                      className="w-full text-left p-4 bg-[var(--bg-section)] hover:bg-white rounded-xl transition-all border border-[rgba(0,0,0,0.08)] hover:border-[var(--accent-purple)] group"
                     >
                       <div className="flex items-center gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${getDifficultyColor(question.difficulty)}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getDifficultyColor(question.difficulty)}`}>
                               {question.difficulty}
                             </span>
                             {question.source && (
-                              <span className="text-lc-text-muted text-xs">{question.source}</span>
+                              <span className="text-[var(--text-muted)] text-xs">{question.source}</span>
                             )}
                           </div>
-                          <h3 className="text-lc-text-primary font-medium">{question.title}</h3>
+                          <h3 className="text-[var(--text-primary)] font-medium">{question.title}</h3>
                         </div>
-                        <svg className="w-4 h-4 text-lc-text-muted group-hover:text-lc-teal transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--accent-purple)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -141,42 +141,42 @@ export default function SystemDesignSelectModal({ isOpen, onClose, onSelect }: S
           {!loading && !error && selectedQuestion && (
             <div className="space-y-6">
               {/* Question info */}
-              <div className="bg-lc-bg-layer-2 rounded-lg p-4">
+              <div className="bg-[var(--bg-section)] rounded-xl p-4 border border-[rgba(0,0,0,0.08)]">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${getDifficultyColor(selectedQuestion.difficulty)}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getDifficultyColor(selectedQuestion.difficulty)}`}>
                     {selectedQuestion.difficulty}
                   </span>
                   {selectedQuestion.source && (
-                    <span className="text-lc-text-muted text-xs">{selectedQuestion.source}</span>
+                    <span className="text-[var(--text-muted)] text-xs">{selectedQuestion.source}</span>
                   )}
                 </div>
-                <p className="text-lc-text-secondary text-sm">
+                <p className="text-[var(--text-secondary)] text-sm">
                   {selectedQuestion.description}
                 </p>
               </div>
 
               {/* How it works */}
-              <div className="bg-lc-bg-layer-2 rounded-lg p-4">
-                <h4 className="text-lc-text-primary font-medium text-sm mb-2">How it works</h4>
-                <ul className="text-lc-text-muted text-sm space-y-1">
+              <div className="bg-[var(--bg-section)] rounded-xl p-4 border border-[rgba(0,0,0,0.08)]">
+                <h4 className="text-[var(--text-primary)] font-medium text-sm mb-2">How it works</h4>
+                <ul className="text-[var(--text-muted)] text-sm space-y-1">
                   <li className="flex items-start gap-2">
-                    <span className="text-lc-teal">1.</span>
+                    <span className="text-[var(--accent-purple)] font-medium">1.</span>
                     <span>You'll discuss the system design problem with an AI interviewer</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-lc-teal">2.</span>
+                    <span className="text-[var(--accent-purple)] font-medium">2.</span>
                     <span>Start by clarifying requirements and constraints</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-lc-teal">3.</span>
+                    <span className="text-[var(--accent-purple)] font-medium">3.</span>
                     <span>Walk through your high-level design and component choices</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-lc-teal">4.</span>
+                    <span className="text-[var(--accent-purple)] font-medium">4.</span>
                     <span>Dive deep into specific areas when prompted</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-lc-teal">5.</span>
+                    <span className="text-[var(--accent-purple)] font-medium">5.</span>
                     <span>Get detailed feedback on your design decisions</span>
                   </li>
                 </ul>
@@ -187,10 +187,10 @@ export default function SystemDesignSelectModal({ isOpen, onClose, onSelect }: S
 
         {/* Footer */}
         {selectedQuestion && (
-          <div className="p-4 border-t border-lc-border">
+          <div className="p-4 border-t border-[rgba(0,0,0,0.08)]">
             <button
               onClick={handleStartPractice}
-              className="w-full py-3 bg-lc-green hover:bg-lc-green-dark text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 btn-primary"
             >
               Start Practice
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

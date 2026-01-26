@@ -334,10 +334,10 @@ export default function SystemDesignInterview() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
+      <div className="h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading interview...</p>
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">Loading interview...</p>
         </div>
       </div>
     )
@@ -346,12 +346,12 @@ export default function SystemDesignInterview() {
   // Error state
   if (loadError || !interview) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
+      <div className="h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
-          <p className="text-red-400 mb-4">{loadError || 'Interview not found'}</p>
+          <p className="text-[#C62828] mb-4">{loadError || 'Interview not found'}</p>
           <button
             onClick={() => navigate('/')}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+            className="btn-primary"
           >
             Go Home
           </button>
@@ -363,10 +363,10 @@ export default function SystemDesignInterview() {
   // Waiting for intro to generate (skip for resumed sessions)
   if (!cachedIntro && (isPreloading || isGeneratingIntro || !isWsConnected) && !isResumedSession && !hasIntroduced) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
+      <div className="h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p>
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">
             {!isWsConnected ? 'Connecting to voice service...' : isGeneratingIntro ? 'Generating introduction...' : 'Preparing AI interviewer...'}
           </p>
         </div>
@@ -379,16 +379,16 @@ export default function SystemDesignInterview() {
   const remainingSeconds = Math.max(0, Math.floor((timeLimitMs - timeSpentMs) / 1000))
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
+    <div className="h-screen flex flex-col bg-[var(--bg-page)] overflow-hidden">
       {/* Loading overlay for submit/give up */}
       {(isSubmitting || isGivingUp) && (
-        <div className="absolute inset-0 z-50 bg-gray-900/90 flex items-center justify-center">
+        <div className="absolute inset-0 z-50 bg-[var(--bg-page)]/95 flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-            <p className="text-lg font-medium">
+            <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+            <p className="text-lg font-medium text-[var(--text-primary)]">
               {isSubmitting ? 'Generating evaluation...' : 'Saving your progress...'}
             </p>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-sm text-[var(--text-muted)] mt-2">
               {isSubmitting ? 'This may take a moment' : 'Please wait'}
             </p>
           </div>
@@ -401,24 +401,24 @@ export default function SystemDesignInterview() {
           <div className="flex items-center gap-4">
             {/* Timer */}
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-lc-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className={`font-mono text-lg font-semibold ${remainingSeconds <= 300 ? 'text-red-400' : 'text-lc-text-primary'}`}>
+              <span className={`font-mono text-lg font-semibold ${remainingSeconds <= 300 ? 'text-[#C62828]' : 'text-[var(--text-primary)]'}`}>
                 {formatTime(timeSpentMs)} / {formatTime(timeLimitMs)}
               </span>
             </div>
             <button
               onClick={handleGiveUp}
               disabled={isSubmitting || isGivingUp}
-              className="px-3 py-1.5 text-sm text-lc-text-muted hover:text-lc-text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isGivingUp ? 'Saving...' : 'Give Up'}
             </button>
             <button
               onClick={handleSubmit}
               disabled={isSubmitting || isGivingUp}
-              className="px-4 py-1.5 bg-lc-green hover:bg-lc-green-dark rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-1.5 bg-[#4CAF50] hover:bg-[#388E3C] text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? 'Submitting...' : 'Submit'}
             </button>
@@ -427,18 +427,18 @@ export default function SystemDesignInterview() {
       >
         {/* Center: Question title and badge */}
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-medium text-lc-text-secondary truncate max-w-md">{question?.title || 'System Design'}</h1>
-          <span className="px-2 py-0.5 text-xs bg-purple-600 text-white rounded">System Design</span>
+          <h1 className="text-sm font-medium text-[var(--text-secondary)] truncate max-w-md">{question?.title || 'System Design'}</h1>
+          <span className="px-2 py-0.5 text-xs bg-[var(--accent-purple)] text-white rounded-lg">System Design</span>
         </div>
       </AppHeader>
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Left panel: Question */}
-        <div className="w-80 p-4 border-r border-gray-700 overflow-y-auto flex-shrink-0">
-          <h2 className="text-xl font-bold mb-4">{question?.title}</h2>
-          <div className="prose prose-invert prose-sm max-w-none">
-            <div className="whitespace-pre-wrap text-gray-300">{question?.description}</div>
+        <div className="w-80 p-4 border-r border-[rgba(0,0,0,0.08)] overflow-y-auto flex-shrink-0 bg-white">
+          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{question?.title}</h2>
+          <div className="prose prose-sm max-w-none">
+            <div className="whitespace-pre-wrap text-[var(--text-secondary)]">{question?.description}</div>
           </div>
         </div>
 
@@ -454,16 +454,16 @@ export default function SystemDesignInterview() {
         </div>
 
         {/* Right panel: Notes */}
-        <div className="w-80 flex flex-col border-l border-gray-700 flex-shrink-0">
-          <div className="p-3 border-b border-gray-700">
-            <h3 className="font-semibold text-sm">Notes</h3>
-            <p className="text-xs text-gray-400 mt-1">Write down your thoughts, calculations, and decisions</p>
+        <div className="w-80 flex flex-col border-l border-[rgba(0,0,0,0.08)] flex-shrink-0 bg-white">
+          <div className="p-3 border-b border-[rgba(0,0,0,0.08)]">
+            <h3 className="font-semibold text-sm text-[var(--text-primary)]">Notes</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Write down your thoughts, calculations, and decisions</p>
           </div>
           <textarea
             value={notes}
             onChange={handleNotesChange}
             placeholder="- Requirements clarification&#10;- Capacity estimates&#10;- API endpoints&#10;- Data model&#10;- Trade-offs..."
-            className="flex-1 p-4 bg-gray-800 text-white text-sm resize-none focus:outline-none font-mono"
+            className="flex-1 p-4 bg-[var(--bg-section)] text-[var(--text-primary)] text-sm resize-none focus:outline-none font-mono border-0"
           />
         </div>
       </div>

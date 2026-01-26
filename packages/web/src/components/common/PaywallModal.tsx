@@ -20,7 +20,6 @@ export default function PaywallModal({
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
 
-  // Track paywall shown
   useEffect(() => {
     if (isOpen) {
       analytics.paywallShown()
@@ -57,14 +56,14 @@ export default function PaywallModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-lc-bg-layer-1 rounded-xl p-6 w-full max-w-md border border-lc-border">
+    <div className="fixed inset-0 bg-[rgba(0,0,0,0.5)] backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="card p-6 w-full max-w-md shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-lc-text-primary">Upgrade to Pro</h2>
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Upgrade to Pro</h2>
           <button
             onClick={onClose}
-            className="text-lc-text-muted hover:text-lc-text-primary transition-colors"
+            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -75,51 +74,49 @@ export default function PaywallModal({
         {/* Message */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-brand-orange/10 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-brand-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-12 h-12 bg-[#FFF3E0] rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-[#E65100]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
             <div>
-              <p className="text-lc-text-primary font-semibold">Free interview limit reached</p>
-              <p className="text-lc-text-muted text-sm">Upgrade to Pro for unlimited interviews</p>
+              <p className="text-[var(--text-primary)] font-semibold">Free interview limit reached</p>
+              <p className="text-[var(--text-muted)] text-sm">Upgrade to Pro for unlimited interviews</p>
             </div>
           </div>
 
-          <p className="text-lc-text-secondary text-sm">
+          <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
             You've used your free interview. Upgrade to Pro to unlock unlimited AI mock interviews, detailed feedback, and progress tracking.
           </p>
         </div>
 
         {/* Pro benefits */}
-        <div className="bg-lc-bg-layer-2 rounded-lg p-4 mb-6">
-          <h3 className="text-lc-text-primary font-medium mb-3">Pro includes:</h3>
-          <ul className="space-y-2">
-            <li className="flex items-center gap-2 text-sm text-lc-text-secondary">
-              <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Unlimited AI mock interviews
-            </li>
-            <li className="flex items-center gap-2 text-sm text-lc-text-secondary">
-              <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Detailed AI feedback on every interview
-            </li>
-            <li className="flex items-center gap-2 text-sm text-lc-text-secondary">
-              <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Full access to NeetCode 150 + System Design
-            </li>
-            <li className="flex items-center gap-2 text-sm text-lc-text-secondary">
-              <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Progress tracking and weakness analysis
-            </li>
+        <div className="bg-[var(--bg-section)] rounded-xl p-4 mb-6">
+          <h3 className="text-[var(--text-primary)] font-medium mb-3">Pro includes:</h3>
+          <ul className="space-y-2.5">
+            {[
+              'Unlimited AI mock interviews',
+              'Detailed AI feedback on every interview',
+              'Full access to NeetCode 150 + System Design',
+              'Progress tracking and weakness analysis',
+            ].map((benefit, i) => (
+              <li key={i} className="flex items-center gap-2.5 text-sm text-[var(--text-secondary)]">
+                <svg className="w-4 h-4 text-[var(--accent-purple)] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {benefit}
+              </li>
+            ))}
           </ul>
+        </div>
+
+        {/* Price */}
+        <div className="text-center mb-6">
+          <div className="flex items-baseline justify-center gap-1">
+            <span className="text-3xl font-semibold text-[var(--text-primary)]">$10</span>
+            <span className="text-[var(--text-muted)]">/month</span>
+          </div>
+          <p className="text-[var(--text-muted)] text-xs mt-1">Cancel anytime</p>
         </div>
 
         {/* Actions */}
@@ -127,7 +124,7 @@ export default function PaywallModal({
           <button
             onClick={handleUpgrade}
             disabled={isLoading}
-            className="w-full py-3 bg-lc-green hover:bg-lc-green-dark text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Loading...' : 'Upgrade to Pro'}
           </button>
@@ -135,11 +132,18 @@ export default function PaywallModal({
           {existingInterview && (
             <button
               onClick={handleResumeInterview}
-              className="w-full py-3 bg-lc-bg-layer-2 hover:bg-lc-bg-layer-3 text-lc-text-primary font-medium rounded-lg transition-colors border border-lc-border"
+              className="w-full py-3 btn-secondary"
             >
               Resume Your Interview
             </button>
           )}
+
+          <button
+            onClick={onClose}
+            className="w-full py-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium transition-colors"
+          >
+            Maybe later
+          </button>
         </div>
       </div>
     </div>

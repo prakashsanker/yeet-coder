@@ -58,17 +58,17 @@ export default function FloatingInterviewer({
   const getAvatarPulse = () => {
     switch (state) {
       case 'listening':
-        return 'ring-4 ring-red-500/50 animate-pulse'
+        return 'ring-4 ring-[#C62828]/50 animate-pulse'
       case 'processing':
-        return 'ring-4 ring-yellow-500/50'
+        return 'ring-4 ring-[#E65100]/50'
       case 'speaking':
-        return 'ring-4 ring-green-500/50 animate-pulse'
+        return 'ring-4 ring-[#4CAF50]/50 animate-pulse'
       default:
         // Show subtle green ring when always-listening is active
         if (isAlwaysListening) {
-          return isSpeechDetected ? 'ring-4 ring-blue-500/50 animate-pulse' : 'ring-2 ring-green-500/30'
+          return isSpeechDetected ? 'ring-4 ring-[var(--accent-blue)]/50 animate-pulse' : 'ring-2 ring-[#4CAF50]/30'
         }
-        return 'ring-2 ring-gray-600'
+        return 'ring-2 ring-[rgba(0,0,0,0.15)]'
     }
   }
 
@@ -91,16 +91,16 @@ export default function FloatingInterviewer({
   const getStatusColor = () => {
     switch (state) {
       case 'listening':
-        return 'text-red-400'
+        return 'text-[#C62828]'
       case 'processing':
-        return 'text-yellow-400'
+        return 'text-[#E65100]'
       case 'speaking':
-        return 'text-green-400'
+        return 'text-[#4CAF50]'
       default:
         if (isAlwaysListening) {
-          return isSpeechDetected ? 'text-blue-400' : 'text-green-400'
+          return isSpeechDetected ? 'text-[var(--accent-blue)]' : 'text-[#4CAF50]'
         }
-        return 'text-gray-400'
+        return 'text-[var(--text-muted)]'
     }
   }
 
@@ -109,46 +109,46 @@ export default function FloatingInterviewer({
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => setIsMinimized(false)}
-          className="w-16 h-16 rounded-full bg-gray-800 border-2 border-gray-700 shadow-2xl flex items-center justify-center hover:scale-105 transition-transform"
+          className="w-16 h-16 rounded-full bg-white border-2 border-[rgba(0,0,0,0.08)] shadow-2xl flex items-center justify-center hover:scale-105 transition-transform"
         >
-          <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center ${state !== 'idle' || isSpeechDetected ? 'animate-pulse' : ''}`}>
+          <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent-purple)] to-[var(--accent-blue)] flex items-center justify-center ${state !== 'idle' || isSpeechDetected ? 'animate-pulse' : ''}`}>
             <InterviewerIcon className="w-6 h-6 text-white" />
           </div>
         </button>
         {(state !== 'idle' || isAlwaysListening) && (
-          <span className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-800 ${isSpeechDetected ? 'bg-blue-500 animate-pulse' : isAlwaysListening ? 'bg-green-500' : 'bg-green-500 animate-pulse'}`} />
+          <span className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isSpeechDetected ? 'bg-[var(--accent-blue)] animate-pulse' : isAlwaysListening ? 'bg-[#4CAF50]' : 'bg-[#4CAF50] animate-pulse'}`} />
         )}
       </div>
     )
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-72 bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
+    <div className="fixed bottom-6 right-6 z-50 w-72 bg-white rounded-2xl shadow-2xl border border-[rgba(0,0,0,0.08)] overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-section)] border-b border-[rgba(0,0,0,0.08)]">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${state !== 'idle' ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+          <span className={`w-2 h-2 rounded-full ${state !== 'idle' ? 'bg-[#4CAF50] animate-pulse' : 'bg-[var(--text-muted)]'}`} />
           <span className={`text-sm font-medium ${getStatusColor()}`}>{getStatusText()}</span>
         </div>
         <button
           onClick={() => setIsMinimized(true)}
-          className="p-1 hover:bg-gray-700 rounded transition-colors"
+          className="p-1 hover:bg-[rgba(0,0,0,0.05)] rounded transition-colors"
         >
-          <MinimizeIcon className="w-4 h-4 text-gray-400" />
+          <MinimizeIcon className="w-4 h-4 text-[var(--text-muted)]" />
         </button>
       </div>
 
       {/* Avatar section */}
       <div className="p-4 flex flex-col items-center">
         {/* Dummy avatar */}
-        <div className={`relative w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center ${getAvatarPulse()} transition-all duration-300`}>
+        <div className={`relative w-20 h-20 rounded-full bg-gradient-to-br from-[var(--accent-purple)] to-[var(--accent-blue)] flex items-center justify-center ${getAvatarPulse()} transition-all duration-300`}>
           <InterviewerIcon className="w-10 h-10 text-white" />
 
           {/* Speaking animation waves */}
           {state === 'speaking' && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="absolute w-full h-full rounded-full border-2 border-green-400 animate-ping opacity-30" />
-              <div className="absolute w-[120%] h-[120%] rounded-full border border-green-400 animate-ping opacity-20" style={{ animationDelay: '0.2s' }} />
+              <div className="absolute w-full h-full rounded-full border-2 border-[#4CAF50] animate-ping opacity-30" />
+              <div className="absolute w-[120%] h-[120%] rounded-full border border-[#4CAF50] animate-ping opacity-20" style={{ animationDelay: '0.2s' }} />
             </div>
           )}
 
@@ -158,7 +158,7 @@ export default function FloatingInterviewer({
               {[1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="w-1.5 bg-red-400 rounded-full"
+                  className="w-1.5 bg-[#C62828] rounded-full"
                   style={{
                     height: `${10 + Math.sin(Date.now() / 200 + i) * 8}px`,
                     animation: 'audioBar 0.3s ease-in-out infinite alternate',
@@ -173,7 +173,7 @@ export default function FloatingInterviewer({
         {/* Live transcript */}
         {transcript && state === 'listening' && (
           <div className="mt-3 w-full">
-            <p className="text-xs text-red-300 text-center italic">
+            <p className="text-xs text-[#C62828] text-center italic">
               "{transcript}"
             </p>
           </div>
@@ -191,20 +191,20 @@ export default function FloatingInterviewer({
               w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200
               ${isAlwaysListening
                 ? isSpeechDetected
-                  ? 'bg-blue-500 hover:bg-blue-600 scale-110'
-                  : 'bg-green-600 hover:bg-green-700'
-                : 'bg-gray-700 hover:bg-gray-600'}
+                  ? 'bg-[var(--accent-blue)] hover:opacity-90 scale-110'
+                  : 'bg-[#4CAF50] hover:bg-[#388E3C]'
+                : 'bg-[var(--bg-section)] hover:bg-[rgba(0,0,0,0.1)]'}
               disabled:opacity-50 disabled:cursor-not-allowed
               shadow-lg hover:shadow-xl
             `}
             title={isAlwaysListening ? 'Click to mute' : 'Click to unmute'}
           >
             {state === 'processing' ? (
-              <LoadingIcon className="w-5 h-5 text-white animate-spin" />
+              <LoadingIcon className="w-5 h-5 text-[var(--accent-purple)] animate-spin" />
             ) : isAlwaysListening ? (
               <MicOnIcon className="w-5 h-5 text-white" />
             ) : (
-              <MicOffIcon className="w-5 h-5 text-white" />
+              <MicOffIcon className="w-5 h-5 text-[var(--text-muted)]" />
             )}
           </button>
         </div>

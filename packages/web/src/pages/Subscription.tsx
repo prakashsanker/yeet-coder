@@ -81,41 +81,41 @@ export default function Subscription() {
   }
 
   return (
-    <div className="min-h-screen bg-lc-bg-dark flex flex-col">
+    <div className="app-page flex flex-col">
       <AppHeader showBack onBack={() => navigate('/dashboard')} />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
-        <h1 className="text-2xl font-bold text-lc-text-primary mb-6">Subscription</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Subscription</h1>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lc-green"></div>
+            <div className="spinner w-8 h-8"></div>
           </div>
         ) : (
           <div className="space-y-6">
             {/* Error message */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                <p className="text-red-400 text-sm">{error}</p>
+              <div className="bg-[#FFEBEE] border border-[#C62828] rounded-xl p-4">
+                <p className="text-[#C62828] text-sm">{error}</p>
               </div>
             )}
 
             {/* Success message */}
             {successMessage && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <p className="text-green-400 text-sm">{successMessage}</p>
+              <div className="bg-[#E8F5E9] border border-[#4CAF50] rounded-xl p-4">
+                <p className="text-[#2E7D32] text-sm">{successMessage}</p>
               </div>
             )}
 
             {/* Current Plan Card */}
-            <div className="bg-lc-bg-layer-1 border border-lc-border rounded-lg p-6">
+            <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-lc-text-primary">Current Plan</h2>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Current Plan</h2>
                 <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  className={`badge ${
                     subscription?.tier === 'pro'
-                      ? 'bg-brand-orange/20 text-brand-orange'
-                      : 'bg-lc-bg-layer-3 text-lc-text-secondary'
+                      ? 'badge-purple'
+                      : 'badge-neutral'
                   }`}
                 >
                   {subscription?.tier === 'pro' ? 'Pro' : 'Free'}
@@ -124,9 +124,9 @@ export default function Subscription() {
 
               {subscription?.tier === 'pro' ? (
                 <div className="space-y-4">
-                  <div className="text-lc-text-secondary text-sm">
+                  <div className="text-[var(--text-secondary)] text-sm">
                     <p className="mb-2">You have access to:</p>
-                    <ul className="list-disc list-inside space-y-1 text-lc-text-muted">
+                    <ul className="list-disc list-inside space-y-1 text-[var(--text-muted)]">
                       <li>Unlimited mock interviews</li>
                       <li>Detailed AI feedback</li>
                       <li>Access to NeetCode 150 + System Design</li>
@@ -135,19 +135,19 @@ export default function Subscription() {
                   </div>
 
                   {subscription.currentPeriodEnd && (
-                    <div className="pt-4 border-t border-lc-border">
-                      <p className="text-sm text-lc-text-muted">
+                    <div className="pt-4 border-t border-[rgba(0,0,0,0.08)]">
+                      <p className="text-sm text-[var(--text-muted)]">
                         {subscription.cancelAtPeriodEnd ? (
                           <>
                             Your subscription will end on{' '}
-                            <span className="text-lc-text-secondary">
+                            <span className="text-[var(--text-secondary)] font-medium">
                               {formatDate(subscription.currentPeriodEnd)}
                             </span>
                           </>
                         ) : (
                           <>
                             Next billing date:{' '}
-                            <span className="text-lc-text-secondary">
+                            <span className="text-[var(--text-secondary)] font-medium">
                               {formatDate(subscription.currentPeriodEnd)}
                             </span>
                           </>
@@ -158,12 +158,12 @@ export default function Subscription() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-lc-text-muted text-sm">
+                  <p className="text-[var(--text-muted)] text-sm">
                     You're on the free plan with limited access. Upgrade to Pro for unlimited interviews and more.
                   </p>
                   <button
                     onClick={handleUpgrade}
-                    className="w-full py-2 px-4 bg-brand-orange hover:bg-brand-orange/90 text-white font-medium rounded-lg transition-colors"
+                    className="w-full btn-primary"
                   >
                     Upgrade to Pro
                   </button>
@@ -173,22 +173,22 @@ export default function Subscription() {
 
             {/* Cancel Subscription Section (only for pro users) */}
             {subscription?.tier === 'pro' && !subscription.cancelAtPeriodEnd && (
-              <div className="bg-lc-bg-layer-1 border border-lc-border rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-lc-text-primary mb-2">Cancel Subscription</h2>
-                <p className="text-lc-text-muted text-sm mb-4">
+              <div className="card p-6">
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Cancel Subscription</h2>
+                <p className="text-[var(--text-muted)] text-sm mb-4">
                   If you cancel, you'll still have access to Pro features until the end of your current billing period.
                 </p>
 
                 {!showConfirmCancel ? (
                   <button
                     onClick={() => setShowConfirmCancel(true)}
-                    className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors"
+                    className="text-[#C62828] hover:text-[#B71C1C] text-sm font-medium transition-colors"
                   >
                     Cancel subscription
                   </button>
                 ) : (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                    <p className="text-lc-text-secondary text-sm mb-4">
+                  <div className="bg-[#FFEBEE] border border-[#C62828] rounded-xl p-4">
+                    <p className="text-[var(--text-secondary)] text-sm mb-4">
                       Are you sure you want to cancel your subscription? You'll lose access to Pro features after{' '}
                       {formatDate(subscription.currentPeriodEnd)}.
                     </p>
@@ -196,14 +196,14 @@ export default function Subscription() {
                       <button
                         onClick={handleCancelSubscription}
                         disabled={isCancelling}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                        className="px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
                       >
                         {isCancelling ? 'Cancelling...' : 'Yes, cancel subscription'}
                       </button>
                       <button
                         onClick={() => setShowConfirmCancel(false)}
                         disabled={isCancelling}
-                        className="px-4 py-2 bg-lc-bg-layer-3 hover:bg-lc-bg-layer-2 text-lc-text-secondary text-sm font-medium rounded-lg transition-colors"
+                        className="btn-secondary text-sm"
                       >
                         Keep subscription
                       </button>
@@ -215,8 +215,8 @@ export default function Subscription() {
 
             {/* Already cancelled notice */}
             {subscription?.tier === 'pro' && subscription.cancelAtPeriodEnd && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                <p className="text-yellow-400 text-sm">
+              <div className="bg-[#FFF3E0] border border-[#E65100] rounded-xl p-4">
+                <p className="text-[#E65100] text-sm">
                   Your subscription is set to cancel. You'll have access to Pro features until{' '}
                   {formatDate(subscription.currentPeriodEnd)}.
                 </p>

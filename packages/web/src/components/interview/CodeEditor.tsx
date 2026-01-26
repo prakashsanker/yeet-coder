@@ -35,14 +35,14 @@ export default function CodeEditor({
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-700 border-b border-gray-600">
-        <span className="text-sm text-gray-300">Solution</span>
+    <div className="flex flex-col h-full bg-white rounded-lg overflow-hidden border border-[rgba(0,0,0,0.08)]">
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-section)] border-b border-[rgba(0,0,0,0.08)]">
+        <span className="text-sm text-[var(--text-secondary)]">Solution</span>
         <select
           value={language}
           onChange={handleLanguageSelect}
           disabled={readOnly}
-          className="bg-gray-600 text-gray-200 text-sm rounded px-2 py-1 border border-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="bg-white text-[var(--text-primary)] text-sm rounded-lg px-2 py-1 border border-[rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
         >
           {Object.entries(languageConfig).map(([key, { label }]) => (
             <option key={key} value={key}>
@@ -61,7 +61,7 @@ export default function CodeEditor({
           theme="vs-dark"
           options={{
             fontSize: 14,
-            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            fontFamily: "'SF Mono', 'JetBrains Mono', 'Fira Code', monospace",
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             lineNumbers: 'on',
