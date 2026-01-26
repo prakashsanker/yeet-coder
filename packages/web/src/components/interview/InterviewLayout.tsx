@@ -62,14 +62,14 @@ export default function InterviewLayout({
 
   return (
     <div
-      className="flex flex-col h-screen bg-gray-900"
+      className="flex flex-col h-screen bg-[var(--bg-page)]"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
       {/* Header */}
       {header && (
-        <div className="flex-shrink-0 border-b border-gray-700">
+        <div className="flex-shrink-0">
           {header}
         </div>
       )}
@@ -89,7 +89,7 @@ export default function InterviewLayout({
 
         {/* Horizontal Resizer */}
         <div
-          className="w-1 hover:w-2 bg-gray-700 hover:bg-primary-500 cursor-col-resize transition-all flex-shrink-0 rounded"
+          className="w-1 hover:w-2 bg-[rgba(0,0,0,0.08)] hover:bg-[var(--accent-purple)] cursor-col-resize transition-all flex-shrink-0 rounded"
           onMouseDown={handleHorizontalMouseDown}
         />
 
@@ -108,7 +108,7 @@ export default function InterviewLayout({
 
           {/* Vertical Resizer */}
           <div
-            className="h-1 hover:h-2 bg-gray-700 hover:bg-primary-500 cursor-row-resize transition-all flex-shrink-0 rounded"
+            className="h-1 hover:h-2 bg-[rgba(0,0,0,0.08)] hover:bg-[var(--accent-purple)] cursor-row-resize transition-all flex-shrink-0 rounded"
             onMouseDown={handleVerticalMouseDown}
           />
 

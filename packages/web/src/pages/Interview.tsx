@@ -591,10 +591,10 @@ export default function Interview() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading interview...</p>
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">Loading interview...</p>
         </div>
       </div>
     )
@@ -603,12 +603,12 @@ export default function Interview() {
   // Error state
   if (loadError || !questionData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
-          <p className="text-red-400 mb-4">{loadError || 'Failed to load interview'}</p>
+          <p className="text-[#C62828] mb-4">{loadError || 'Failed to load interview'}</p>
           <button
             onClick={() => navigate('/onboarding')}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+            className="btn-primary"
           >
             Start New Interview
           </button>
@@ -620,10 +620,10 @@ export default function Interview() {
   // Waiting for intro to generate (skip for resumed sessions)
   if (!cachedIntro && (isPreloading || isGeneratingIntro || !isWsConnected) && !isResumedSession && !hasIntroduced) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">
             {!isWsConnected ? 'Connecting to voice service...' : isGeneratingIntro ? 'Generating introduction...' : 'Preparing AI interviewer...'}
           </p>
         </div>
@@ -635,20 +635,20 @@ export default function Interview() {
     <>
       <InterviewLayout
         header={
-          <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center justify-between px-4 h-14 bg-white border-b border-[rgba(0,0,0,0.08)]">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/')}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center">
-                  <span className="text-lc-bg-dark font-bold text-lg">Y</span>
+                <div className="w-8 h-8 bg-[var(--accent-purple)] rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">Y</span>
                 </div>
-                <span className="text-lc-text-primary font-semibold text-lg">YeetCoder</span>
+                <span className="text-[var(--text-primary)] font-semibold text-lg">YeetCoder</span>
               </button>
-              <span className="text-lc-text-muted">|</span>
-              <span className="text-lc-text-secondary text-sm">{questionData.title}</span>
-              <span className="px-2 py-0.5 text-xs bg-lc-bg-layer-2 text-lc-text-muted rounded">
+              <span className="text-[rgba(0,0,0,0.2)]">|</span>
+              <span className="text-[var(--text-secondary)] text-sm">{questionData.title}</span>
+              <span className="px-2 py-0.5 text-xs bg-[var(--bg-section)] text-[var(--text-muted)] rounded-lg">
                 Runs: {runCount}
               </span>
             </div>
@@ -660,7 +660,7 @@ export default function Interview() {
               />
               <button
                 onClick={handleGiveUp}
-                className="px-4 py-2 text-sm text-lc-text-muted hover:text-lc-text-primary transition-colors"
+                className="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
                 Give Up
               </button>

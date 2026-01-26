@@ -19,7 +19,6 @@ export default function Onboarding() {
   const location = useLocation()
   const { user, isLoading: authLoading } = useAuth()
 
-  // Check if a question was pre-selected from Dashboard
   const locationState = location.state as LocationState | null
   const preSelectedQuestion = locationState?.selectedQuestion
 
@@ -73,7 +72,6 @@ export default function Onboarding() {
     }
   }, [interviewType])
 
-  // Load system design questions directly
   useEffect(() => {
     if (interviewType === 'system_design') {
       setLoading(true)
@@ -85,7 +83,6 @@ export default function Onboarding() {
     }
   }, [interviewType])
 
-  // Load questions when topic is selected (for LeetCode)
   useEffect(() => {
     if (selectedTopic) {
       setLoading(true)
@@ -109,7 +106,6 @@ export default function Onboarding() {
   const handleBack = () => {
     const step = getCurrentStep()
     if (step === 'confirm') {
-      // If came from dashboard with pre-selected question, go back to dashboard
       if (preSelectedQuestion) {
         navigate('/dashboard')
         return
@@ -145,20 +141,16 @@ export default function Onboarding() {
     setIsStarting(true)
     setError(null)
 
-    // Track interview start clicked
     analytics.interviewStartClicked(selectedQuestion.id, interviewType || 'leetcode')
 
     try {
-      // Create interview session first
       const { interview } = await api.interviews.create({
         question_id: selectedQuestion.id,
         language: interviewType === 'leetcode' ? 'python' : undefined,
       })
 
-      // Track interview created
       analytics.interviewCreated(interview.id, interview.session_type)
 
-      // Navigate to the correct interview page based on session type
       if (interview.session_type === 'system_design') {
         navigate(`/system-design/${interview.id}`)
       } else {
@@ -167,7 +159,6 @@ export default function Onboarding() {
     } catch (err) {
       console.error('Failed to create interview:', err)
 
-      // Check if this is a free tier limit error
       if (err instanceof ApiError && err.code === 'free_tier_limit') {
         analytics.freeTierLimitHit()
         const existingInterviewData = err.data?.existingInterview as {
@@ -188,10 +179,10 @@ export default function Onboarding() {
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'text-lc-green bg-lc-green/10'
-      case 'medium': return 'text-lc-yellow bg-lc-yellow/10'
-      case 'hard': return 'text-lc-red bg-lc-red/10'
-      default: return 'text-lc-text-muted bg-lc-bg-layer-2'
+      case 'easy': return 'difficulty-easy'
+      case 'medium': return 'difficulty-medium'
+      case 'hard': return 'difficulty-hard'
+      default: return 'badge-neutral'
     }
   }
 
@@ -199,54 +190,53 @@ export default function Onboarding() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-lc-bg-dark flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-orange"></div>
+      <div className="app-page flex items-center justify-center">
+        <div className="spinner w-8 h-8"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-lc-bg-dark">
-      {/* Header */}
+    <div className="app-page">
       <AppHeader showBack onBack={handleBack}>
         {/* Progress indicator */}
         <div className="flex items-center gap-2">
           {userIsAdmin && (
             <>
-              <div className={`w-2 h-2 rounded-full ${step === 'type' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
-              <div className={`w-2 h-2 rounded-full ${step === 'topic' || (interviewType === 'system_design' && step === 'question') ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
+              <div className={`w-2 h-2 rounded-full transition-colors ${step === 'type' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
+              <div className={`w-2 h-2 rounded-full transition-colors ${step === 'topic' || (interviewType === 'system_design' && step === 'question') ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
             </>
           )}
-          <div className={`w-2 h-2 rounded-full ${step === 'question' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
-          <div className={`w-2 h-2 rounded-full ${step === 'confirm' ? 'bg-brand-orange' : 'bg-lc-text-muted/30'}`} />
+          <div className={`w-2 h-2 rounded-full transition-colors ${step === 'question' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
+          <div className={`w-2 h-2 rounded-full transition-colors ${step === 'confirm' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
         </div>
       </AppHeader>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-6 py-12">
         {/* Step: Choose Interview Type (admin only) */}
         {step === 'type' && userIsAdmin && (
           <div className="space-y-8">
             <div className="text-center">
-              <h1 className="text-3xl font-bold text-lc-text-primary mb-2">What do you want to practice?</h1>
-              <p className="text-lc-text-muted">Choose your interview type to get started</p>
+              <h1 className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight mb-3">What do you want to practice?</h1>
+              <p className="text-[var(--text-muted)]">Choose your interview type to get started</p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
               {/* LeetCode */}
               <button
                 onClick={() => {
                   setInterviewType('leetcode')
                   analytics.interviewTypeSelected('leetcode')
                 }}
-                className="text-left p-6 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-xl transition-all border-2 border-transparent hover:border-brand-orange/50 group"
+                className="text-left p-6 card card-hover border-2 border-[rgba(0,0,0,0.08)] hover:border-[var(--accent-blue)] group"
               >
-                <div className="w-14 h-14 bg-brand-orange/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-brand-orange/20 transition-colors">
-                  <svg className="w-7 h-7 text-brand-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-14 h-14 bg-[#E3F2FD] rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#BBDEFB] transition-colors">
+                  <svg className="w-7 h-7 text-[var(--accent-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-lc-text-primary mb-2">LeetCode Practice</h3>
-                <p className="text-lc-text-muted text-sm">Solve coding problems while explaining your thought process to an AI interviewer</p>
+                <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">LeetCode Practice</h3>
+                <p className="text-[var(--text-muted)] text-sm leading-relaxed">Solve coding problems while explaining your thought process to an AI interviewer</p>
               </button>
 
               {/* System Design */}
@@ -255,15 +245,15 @@ export default function Onboarding() {
                   setInterviewType('system_design')
                   analytics.interviewTypeSelected('system_design')
                 }}
-                className="text-left p-6 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-xl transition-all border-2 border-transparent hover:border-lc-teal/50 group"
+                className="text-left p-6 card card-hover border-2 border-[rgba(0,0,0,0.08)] hover:border-[var(--accent-purple)] group"
               >
-                <div className="w-14 h-14 bg-lc-teal/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-lc-teal/20 transition-colors">
-                  <svg className="w-7 h-7 text-lc-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-14 h-14 bg-[#F3E5F5] rounded-xl flex items-center justify-center mb-4 group-hover:bg-[#E1BEE7] transition-colors">
+                  <svg className="w-7 h-7 text-[var(--accent-purple)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-lc-text-primary mb-2">System Design</h3>
-                <p className="text-lc-text-muted text-sm">Design scalable systems and discuss architecture decisions with AI feedback</p>
+                <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">System Design</h3>
+                <p className="text-[var(--text-muted)] text-sm leading-relaxed">Design scalable systems and discuss architecture decisions with AI feedback</p>
               </button>
             </div>
           </div>
@@ -273,19 +263,19 @@ export default function Onboarding() {
         {step === 'topic' && interviewType === 'leetcode' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold text-lc-text-primary mb-2">Select a Topic</h1>
-              <p className="text-lc-text-muted">Choose a topic to practice</p>
+              <h1 className="text-2xl font-semibold text-[var(--text-primary)] tracking-tight mb-2">Select a Topic</h1>
+              <p className="text-[var(--text-muted)]">Choose a topic to practice</p>
             </div>
 
             {loading && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-orange"></div>
+                <div className="spinner w-8 h-8"></div>
               </div>
             )}
 
             {error && (
               <div className="text-center py-12">
-                <p className="text-lc-red">{error}</p>
+                <p className="text-[#C62828]">{error}</p>
               </div>
             )}
 
@@ -298,19 +288,19 @@ export default function Onboarding() {
                       setSelectedTopic(topic)
                       analytics.topicSelected(topic.id, topic.name)
                     }}
-                    className="w-full text-left p-4 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-lg transition-all border border-transparent hover:border-brand-orange/30 group"
+                    className="w-full text-left p-4 card card-hover border border-[rgba(0,0,0,0.08)] hover:border-[var(--accent-blue)] group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-lc-bg-layer-2 rounded-lg flex items-center justify-center text-lc-text-muted text-sm font-medium group-hover:bg-brand-orange/10 group-hover:text-brand-orange transition-colors">
+                      <div className="w-10 h-10 bg-[var(--bg-section)] rounded-lg flex items-center justify-center text-[var(--text-muted)] text-sm font-medium group-hover:bg-[#E3F2FD] group-hover:text-[var(--accent-blue)] transition-colors">
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-lc-text-primary font-medium">{topic.name}</h3>
+                        <h3 className="text-[var(--text-primary)] font-medium">{topic.name}</h3>
                         {topic.description && (
-                          <p className="text-lc-text-muted text-sm mt-0.5">{topic.description}</p>
+                          <p className="text-[var(--text-muted)] text-sm mt-0.5">{topic.description}</p>
                         )}
                       </div>
-                      <svg className="w-5 h-5 text-lc-text-muted group-hover:text-brand-orange transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--accent-blue)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
@@ -325,27 +315,27 @@ export default function Onboarding() {
         {step === 'question' && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl font-bold text-lc-text-primary mb-2">
+              <h1 className="text-2xl font-semibold text-[var(--text-primary)] tracking-tight mb-2">
                 {interviewType === 'leetcode' ? selectedTopic?.name : 'System Design Questions'}
               </h1>
-              <p className="text-lc-text-muted">Choose a problem to practice</p>
+              <p className="text-[var(--text-muted)]">Choose a problem to practice</p>
             </div>
 
             {loading && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-orange"></div>
+                <div className="spinner w-8 h-8"></div>
               </div>
             )}
 
             {error && (
               <div className="text-center py-12">
-                <p className="text-lc-red">{error}</p>
+                <p className="text-[#C62828]">{error}</p>
               </div>
             )}
 
             {!loading && !error && questions.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-lc-text-muted">No questions available for this topic yet.</p>
+              <div className="text-center py-12 card">
+                <p className="text-[var(--text-muted)]">No questions available for this topic yet.</p>
               </div>
             )}
 
@@ -358,24 +348,24 @@ export default function Onboarding() {
                       setSelectedQuestion(question)
                       analytics.questionSelected(question.id, question.title, question.difficulty)
                     }}
-                    className="w-full text-left p-4 bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2 rounded-lg transition-all border border-transparent hover:border-brand-orange/30 group"
+                    className="w-full text-left p-4 card card-hover border border-[rgba(0,0,0,0.08)] hover:border-[var(--accent-purple)] group"
                   >
                     <div className="flex items-center gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           {question.leetcode_number && (
-                            <span className="text-lc-text-muted text-sm">#{question.leetcode_number}</span>
+                            <span className="text-[var(--text-muted)] text-sm">#{question.leetcode_number}</span>
                           )}
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${getDifficultyColor(question.difficulty)}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getDifficultyColor(question.difficulty)}`}>
                             {question.difficulty}
                           </span>
                           {question.source && (
-                            <span className="text-lc-text-muted text-xs">{question.source}</span>
+                            <span className="text-[var(--text-muted)] text-xs">{question.source}</span>
                           )}
                         </div>
-                        <h3 className="text-lc-text-primary font-medium">{question.title}</h3>
+                        <h3 className="text-[var(--text-primary)] font-medium">{question.title}</h3>
                       </div>
-                      <svg className="w-5 h-5 text-lc-text-muted group-hover:text-brand-orange transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--text-muted)] group-hover:text-[var(--accent-purple)] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
@@ -390,66 +380,66 @@ export default function Onboarding() {
         {step === 'confirm' && selectedQuestion && (
           <div className="space-y-6 max-w-2xl mx-auto">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-lc-text-primary mb-2">Ready to Start</h1>
-              <p className="text-lc-text-muted">Review your selection and begin your interview</p>
+              <h1 className="text-2xl font-semibold text-[var(--text-primary)] tracking-tight mb-2">Ready to Start</h1>
+              <p className="text-[var(--text-muted)]">Review your selection and begin your interview</p>
             </div>
 
             {/* Selected question card */}
-            <div className="bg-lc-bg-layer-1 rounded-xl p-6 border border-lc-border">
+            <div className="card p-6">
               <div className="flex items-center gap-2 mb-3">
                 {selectedQuestion.leetcode_number && (
-                  <span className="text-lc-text-muted text-sm">#{selectedQuestion.leetcode_number}</span>
+                  <span className="text-[var(--text-muted)] text-sm">#{selectedQuestion.leetcode_number}</span>
                 )}
-                <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${getDifficultyColor(selectedQuestion.difficulty)}`}>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getDifficultyColor(selectedQuestion.difficulty)}`}>
                   {selectedQuestion.difficulty}
                 </span>
                 {selectedQuestion.source && (
-                  <span className="text-lc-text-muted text-xs">{selectedQuestion.source}</span>
+                  <span className="text-[var(--text-muted)] text-xs">{selectedQuestion.source}</span>
                 )}
               </div>
-              <h2 className="text-xl font-semibold text-lc-text-primary mb-3">{selectedQuestion.title}</h2>
-              <p className="text-lc-text-secondary text-sm line-clamp-3">{selectedQuestion.description}</p>
+              <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-3">{selectedQuestion.title}</h2>
+              <p className="text-[var(--text-secondary)] text-sm leading-relaxed line-clamp-3">{selectedQuestion.description}</p>
             </div>
 
             {/* How it works */}
-            <div className="bg-lc-bg-layer-1 rounded-xl p-6 border border-lc-border">
-              <h3 className="text-lc-text-primary font-semibold mb-4">How it works</h3>
+            <div className="card p-6">
+              <h3 className="text-[var(--text-primary)] font-semibold mb-4">How it works</h3>
               <ul className="space-y-3">
                 {interviewType === 'leetcode' ? (
                   <>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-brand-orange/10 text-brand-orange rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">1</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#E3F2FD] text-[var(--accent-blue)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">1</span>
                       <span>You'll see the full problem and can start coding</span>
                     </li>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-brand-orange/10 text-brand-orange rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">2</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#E3F2FD] text-[var(--accent-blue)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">2</span>
                       <span>Explain your approach out loud as you code</span>
                     </li>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-brand-orange/10 text-brand-orange rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">3</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#E3F2FD] text-[var(--accent-blue)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">3</span>
                       <span>The AI interviewer will ask clarifying questions</span>
                     </li>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-brand-orange/10 text-brand-orange rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">4</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#E3F2FD] text-[var(--accent-blue)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">4</span>
                       <span>Get instant feedback when you're done</span>
                     </li>
                   </>
                 ) : (
                   <>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-lc-teal/10 text-lc-teal rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">1</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#F3E5F5] text-[var(--accent-purple)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">1</span>
                       <span>Discuss the system design problem with an AI interviewer</span>
                     </li>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-lc-teal/10 text-lc-teal rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">2</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#F3E5F5] text-[var(--accent-purple)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">2</span>
                       <span>Start by clarifying requirements and constraints</span>
                     </li>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-lc-teal/10 text-lc-teal rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">3</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#F3E5F5] text-[var(--accent-purple)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">3</span>
                       <span>Walk through your high-level design and component choices</span>
                     </li>
-                    <li className="flex items-start gap-3 text-lc-text-muted text-sm">
-                      <span className="w-6 h-6 bg-lc-teal/10 text-lc-teal rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium">4</span>
+                    <li className="flex items-start gap-3 text-[var(--text-secondary)] text-sm">
+                      <span className="w-6 h-6 bg-[#F3E5F5] text-[var(--accent-purple)] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold">4</span>
                       <span>Get detailed feedback on your design decisions</span>
                     </li>
                   </>
@@ -461,11 +451,11 @@ export default function Onboarding() {
             <button
               onClick={handleStartPractice}
               disabled={isStarting}
-              className="w-full py-4 bg-lc-green hover:bg-lc-green-dark text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 btn-primary text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isStarting ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <div className="spinner w-5 h-5 border-white border-t-transparent"></div>
                   Creating Interview...
                 </>
               ) : (
@@ -481,7 +471,6 @@ export default function Onboarding() {
         )}
       </main>
 
-      {/* Paywall Modal */}
       <PaywallModal
         isOpen={showPaywall}
         onClose={() => setShowPaywall(false)}

@@ -27,10 +27,10 @@ export default function InterviewTimer({
 
   // Determine urgency level for styling
   const getUrgencyClass = () => {
-    if (seconds <= 60) return 'text-red-500 animate-pulse' // Last minute
-    if (seconds <= 300) return 'text-red-400' // Last 5 minutes
-    if (seconds <= 600) return 'text-yellow-400' // Last 10 minutes
-    return 'text-gray-200'
+    if (seconds <= 60) return 'text-[#C62828] animate-pulse' // Last minute
+    if (seconds <= 300) return 'text-[#C62828]' // Last 5 minutes
+    if (seconds <= 600) return 'text-[#E65100]' // Last 10 minutes
+    return 'text-[var(--text-primary)]'
   }
 
   return (

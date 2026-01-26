@@ -138,10 +138,10 @@ export default function Evaluation() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lc-bg-dark">
+      <div className="app-page flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-orange mx-auto mb-4"></div>
-          <p className="text-lc-text-muted">Loading evaluation...</p>
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">Loading evaluation...</p>
         </div>
       </div>
     )
@@ -149,12 +149,12 @@ export default function Evaluation() {
 
   if (error || !evaluation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lc-bg-dark">
+      <div className="app-page flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lc-red mb-4">{error || 'Evaluation not found'}</p>
+          <p className="text-[#C62828] mb-4">{error || 'Evaluation not found'}</p>
           <button
             onClick={() => navigate('/')}
-            className="px-4 py-2 bg-brand-orange hover:bg-brand-orange/90 text-white rounded-lg transition-colors"
+            className="btn-primary"
           >
             Return Home
           </button>
@@ -174,47 +174,30 @@ export default function Evaluation() {
   const overallPassRate = totalTests > 0 ? Math.round((totalPassed / totalTests) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-lc-bg-dark text-white">
+    <div className="app-page">
       {/* Header */}
-      <AppHeader
-        rightContent={
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="text-lc-text-muted hover:text-lc-text-primary text-sm transition-colors"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => navigate('/onboarding')}
-              className="px-4 py-1.5 bg-lc-green hover:bg-lc-green-dark text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              Start New Interview
-            </button>
-          </div>
-        }
-      />
+      <AppHeader />
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Question Title */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-[var(--text-primary)]">
               {evaluation.interview?.question?.title || 'Interview Completed'}
             </h2>
             {isSystemDesign && (
-              <span className="px-2 py-1 text-xs bg-purple-600 rounded">System Design</span>
+              <span className="badge badge-purple">System Design</span>
             )}
           </div>
           {evaluation.interview?.question?.difficulty && (
             <span
-              className={`px-2 py-1 text-xs rounded ${
+              className={`badge capitalize ${
                 evaluation.interview.question.difficulty === 'easy'
-                  ? 'bg-green-600'
+                  ? 'difficulty-easy'
                   : evaluation.interview.question.difficulty === 'medium'
-                  ? 'bg-yellow-600'
-                  : 'bg-red-600'
+                  ? 'difficulty-medium'
+                  : 'difficulty-hard'
               }`}
             >
               {evaluation.interview.question.difficulty.charAt(0).toUpperCase() +
@@ -226,66 +209,66 @@ export default function Evaluation() {
         {/* Stats Row - Different for system design vs coding */}
         {isSystemDesign ? (
           <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-lc-bg-layer-1 rounded-lg p-4 text-center border border-lc-border">
-              <div className="text-2xl font-bold text-brand-orange">
+            <div className="card p-5 text-center">
+              <div className="text-2xl font-bold text-[var(--accent-purple)]">
                 {formatTime(evaluation.interview?.time_spent_seconds)}
               </div>
-              <div className="text-sm text-lc-text-muted">Time Spent</div>
+              <div className="text-sm text-[var(--text-muted)] mt-1">Time Spent</div>
             </div>
-            <div className="bg-lc-bg-layer-1 rounded-lg p-4 text-center border border-lc-border">
-              <div className="text-2xl font-bold text-brand-orange">
+            <div className="card p-5 text-center">
+              <div className="text-2xl font-bold text-[var(--accent-purple)]">
                 {evaluation.interview?.transcript?.length || 0}
               </div>
-              <div className="text-sm text-lc-text-muted">Conversation Turns</div>
+              <div className="text-sm text-[var(--text-muted)] mt-1">Conversation Turns</div>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-4 mb-8">
-            <div className="bg-lc-bg-layer-1 rounded-lg p-4 text-center border border-lc-border">
-              <div className="text-2xl font-bold text-brand-orange">
+            <div className="card p-5 text-center">
+              <div className="text-2xl font-bold text-[var(--accent-blue)]">
                 {formatTime(evaluation.interview?.time_spent_seconds)}
               </div>
-              <div className="text-sm text-lc-text-muted">Time Spent</div>
+              <div className="text-sm text-[var(--text-muted)] mt-1">Time Spent</div>
             </div>
-            <div className="bg-lc-bg-layer-1 rounded-lg p-4 text-center border border-lc-border">
-              <div className="text-2xl font-bold text-brand-orange">
+            <div className="card p-5 text-center">
+              <div className="text-2xl font-bold text-[var(--accent-blue)]">
                 {evaluation.interview?.run_count || 0}
               </div>
-              <div className="text-sm text-lc-text-muted">Runs</div>
+              <div className="text-sm text-[var(--text-muted)] mt-1">Runs</div>
             </div>
-            <div className="bg-lc-bg-layer-1 rounded-lg p-4 text-center border border-lc-border">
-              <div className="text-2xl font-bold text-brand-orange">
+            <div className="card p-5 text-center">
+              <div className="text-2xl font-bold text-[var(--accent-blue)]">
                 {evaluation.interview?.submit_count || 0}
               </div>
-              <div className="text-sm text-lc-text-muted">Submissions</div>
+              <div className="text-sm text-[var(--text-muted)] mt-1">Submissions</div>
             </div>
-            <div className="bg-lc-bg-layer-1 rounded-lg p-4 text-center border border-lc-border">
-              <div className={`text-2xl font-bold ${overallPassRate >= 70 ? 'text-lc-green' : overallPassRate >= 50 ? 'text-lc-yellow' : 'text-lc-red'}`}>
+            <div className="card p-5 text-center">
+              <div className={`text-2xl font-bold ${overallPassRate >= 70 ? 'score-success' : overallPassRate >= 50 ? 'score-warning' : 'score-error'}`}>
                 {overallPassRate}%
               </div>
-              <div className="text-sm text-lc-text-muted">Tests Passed</div>
+              <div className="text-sm text-[var(--text-muted)] mt-1">Tests Passed</div>
             </div>
           </div>
         )}
 
         {/* Test Results Breakdown - Only for coding */}
         {!isSystemDesign && testResults && totalTests > 0 && (
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-            <h3 className="text-lg font-semibold mb-4">Test Results</h3>
+          <div className="card p-6 mb-8">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Test Results</h3>
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-lc-text-muted">Visible Tests</span>
+                  <span className="text-[var(--text-muted)]">Visible Tests</span>
                   <span className={`font-semibold ${
-                    testResults.visible.passed === testResults.visible.total ? 'text-lc-green' : 'text-lc-yellow'
+                    testResults.visible.passed === testResults.visible.total ? 'score-success' : 'score-warning'
                   }`}>
                     {testResults.visible.passed}/{testResults.visible.total}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-lc-bg-layer-2 rounded-full overflow-hidden">
+                <div className="progress-bar">
                   <div
-                    className={`h-full rounded-full ${
-                      testResults.visible.passed === testResults.visible.total ? 'bg-lc-green' : 'bg-lc-yellow'
+                    className={`progress-bar-fill ${
+                      testResults.visible.passed === testResults.visible.total ? 'progress-bar-fill-success' : 'progress-bar-fill-warning'
                     }`}
                     style={{ width: testResults.visible.total > 0 ? `${(testResults.visible.passed / testResults.visible.total) * 100}%` : '0%' }}
                   />
@@ -293,17 +276,17 @@ export default function Evaluation() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-lc-text-muted">Hidden Tests</span>
+                  <span className="text-[var(--text-muted)]">Hidden Tests</span>
                   <span className={`font-semibold ${
-                    testResults.hidden.passed === testResults.hidden.total ? 'text-lc-green' : 'text-lc-red'
+                    testResults.hidden.passed === testResults.hidden.total ? 'score-success' : 'score-error'
                   }`}>
                     {testResults.hidden.passed}/{testResults.hidden.total}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-lc-bg-layer-2 rounded-full overflow-hidden">
+                <div className="progress-bar">
                   <div
                     className={`h-full rounded-full ${
-                      testResults.hidden.passed === testResults.hidden.total ? 'bg-lc-green' : 'bg-lc-red'
+                      testResults.hidden.passed === testResults.hidden.total ? 'bg-[#4CAF50]' : 'bg-[#C62828]'
                     }`}
                     style={{ width: testResults.hidden.total > 0 ? `${(testResults.hidden.passed / testResults.hidden.total) * 100}%` : '0%' }}
                   />
@@ -323,11 +306,11 @@ export default function Evaluation() {
           )
         ) : (
           /* Pending Evaluation */
-          <div className="bg-lc-bg-layer-1 rounded-lg p-8 text-center mb-8 border border-lc-border">
+          <div className="card p-8 text-center mb-8">
             <div className="animate-pulse mb-4">
-              <div className="w-16 h-16 bg-brand-orange/30 rounded-full mx-auto flex items-center justify-center">
+              <div className="w-16 h-16 bg-[#F3E5F5] rounded-full mx-auto flex items-center justify-center">
                 <svg
-                  className="w-8 h-8 text-brand-orange"
+                  className="w-8 h-8 text-[var(--accent-purple)]"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -341,11 +324,11 @@ export default function Evaluation() {
                 </svg>
               </div>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Interview Submitted!</h3>
-            <p className="text-lc-text-muted mb-4">
+            <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Interview Submitted!</h3>
+            <p className="text-[var(--text-muted)] mb-4">
               Your submission has been recorded. AI evaluation is being generated...
             </p>
-            <p className="text-sm text-lc-text-muted">
+            <p className="text-sm text-[var(--text-muted)]">
               Refresh the page in a few moments to see your detailed feedback.
             </p>
           </div>
@@ -353,20 +336,20 @@ export default function Evaluation() {
 
         {/* User's Custom Test Cases - Only for coding */}
         {!isSystemDesign && evaluation.user_test_cases && evaluation.user_test_cases.length > 0 && (
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-            <h3 className="text-lg font-semibold mb-4">Your Custom Test Cases ({evaluation.user_test_cases.length})</h3>
+          <div className="card p-6 mb-8">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Your Custom Test Cases ({evaluation.user_test_cases.length})</h3>
             <div className="space-y-3">
               {evaluation.user_test_cases.map((tc, index) => (
-                <div key={index} className="bg-lc-bg-layer-2 rounded-lg p-3">
-                  <div className="text-sm text-lc-text-muted mb-1">Test Case {index + 1}</div>
+                <div key={index} className="bg-[var(--bg-section)] rounded-lg p-3">
+                  <div className="text-sm text-[var(--text-muted)] mb-1">Test Case {index + 1}</div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-lc-text-muted">Input:</span>
-                      <pre className="text-lc-text-secondary mt-1 bg-lc-bg-dark p-2 rounded overflow-x-auto">{tc.input || '(empty)'}</pre>
+                      <span className="text-[var(--text-muted)]">Input:</span>
+                      <pre className="text-[var(--text-secondary)] mt-1 bg-white p-2 rounded overflow-x-auto">{tc.input || '(empty)'}</pre>
                     </div>
                     <div>
-                      <span className="text-lc-text-muted">Expected:</span>
-                      <pre className="text-lc-text-secondary mt-1 bg-lc-bg-dark p-2 rounded overflow-x-auto">{tc.expected_output || '(empty)'}</pre>
+                      <span className="text-[var(--text-muted)]">Expected:</span>
+                      <pre className="text-[var(--text-secondary)] mt-1 bg-white p-2 rounded overflow-x-auto">{tc.expected_output || '(empty)'}</pre>
                     </div>
                   </div>
                 </div>
@@ -377,14 +360,14 @@ export default function Evaluation() {
 
         {/* Submitted Code - Only for coding */}
         {!isSystemDesign && evaluation.interview?.final_code && (
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
+          <div className="card p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Your Submitted Code</h3>
-              <span className="px-2 py-1 text-xs bg-lc-bg-layer-2 text-lc-text-secondary rounded">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Your Submitted Code</h3>
+              <span className="badge badge-neutral">
                 {evaluation.interview.language}
               </span>
             </div>
-            <pre className="bg-lc-bg-dark rounded-lg p-4 overflow-x-auto text-sm text-lc-text-secondary">
+            <pre className="bg-[#1e1e1e] rounded-lg p-4 overflow-x-auto text-sm text-[#d4d4d4]">
               <code>{evaluation.interview.final_code}</code>
             </pre>
           </div>
@@ -392,9 +375,9 @@ export default function Evaluation() {
 
         {/* Notes - Only for system design */}
         {isSystemDesign && (evaluation.evaluated_notes || evaluation.interview?.notes) && (
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-            <h3 className="text-lg font-semibold mb-4">Your Notes</h3>
-            <pre className="bg-lc-bg-dark rounded-lg p-4 overflow-x-auto text-sm text-lc-text-secondary whitespace-pre-wrap font-mono">
+          <div className="card p-6 mb-8">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Your Notes</h3>
+            <pre className="bg-[#1e1e1e] rounded-lg p-4 overflow-x-auto text-sm text-[#d4d4d4] whitespace-pre-wrap font-mono">
               {evaluation.evaluated_notes || evaluation.interview?.notes}
             </pre>
           </div>
@@ -411,22 +394,22 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
   return (
     <>
       {/* Overall Score */}
-      <div className="mb-8 p-6 rounded-lg text-center bg-lc-bg-layer-1 border border-lc-border">
+      <div className="mb-8 p-6 card text-center">
         <div className={`text-4xl font-bold mb-2 ${
-          (evaluation.overall_score || 0) >= 70 ? 'text-lc-green' :
-          (evaluation.overall_score || 0) >= 50 ? 'text-lc-yellow' : 'text-lc-red'
+          (evaluation.overall_score || 0) >= 70 ? 'score-success' :
+          (evaluation.overall_score || 0) >= 50 ? 'score-warning' : 'score-error'
         }`}>
           {evaluation.overall_score}/100
         </div>
-        <div className="text-lg text-lc-text-secondary">Overall Score</div>
+        <div className="text-lg text-[var(--text-secondary)]">Overall Score</div>
         {feedback?.summary && (
-          <p className="mt-4 text-lc-text-muted max-w-2xl mx-auto">{feedback.summary}</p>
+          <p className="mt-4 text-[var(--text-muted)] max-w-2xl mx-auto">{feedback.summary}</p>
         )}
       </div>
 
       {/* Score Breakdown */}
-      <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-        <h3 className="text-lg font-semibold mb-4">Score Breakdown</h3>
+      <div className="card p-6 mb-8">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Score Breakdown</h3>
         <div className="grid grid-cols-2 gap-4">
           {[
             { label: 'Requirements Gathering', score: evaluation.requirements_gathering_score, description: 'Clarifying functional & non-functional requirements' },
@@ -439,23 +422,23 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
           ].map(({ label, score, description }) => (
             <div key={label} className="flex items-center justify-between group relative">
               <div>
-                <span className="text-lc-text-secondary">{label}</span>
-                <p className="text-xs text-lc-text-muted">{description}</p>
+                <span className="text-[var(--text-secondary)]">{label}</span>
+                <p className="text-xs text-[var(--text-muted)]">{description}</p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-24 h-2 bg-lc-bg-layer-2 rounded-full overflow-hidden">
+                <div className="progress-bar w-24">
                   <div
                     className={`h-full rounded-full ${
                       (score || 0) >= 70
-                        ? 'bg-lc-green'
+                        ? 'bg-[#4CAF50]'
                         : (score || 0) >= 50
-                        ? 'bg-lc-yellow'
-                        : 'bg-lc-red'
+                        ? 'bg-[#FF9800]'
+                        : 'bg-[#C62828]'
                     }`}
                     style={{ width: `${score || 0}%` }}
                   />
                 </div>
-                <span className="text-sm text-lc-text-secondary w-8 text-right">{score || 0}</span>
+                <span className="text-sm text-[var(--text-secondary)] w-8 text-right">{score || 0}</span>
               </div>
             </div>
           ))}
@@ -466,14 +449,14 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
       {feedback && isSystemDesignFeedback(feedback) && (
         <div className="grid grid-cols-2 gap-6 mb-8">
           {/* Good Points */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-green mb-4">What You Did Well</h3>
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-[#2E7D32] mb-4">What You Did Well</h3>
             {feedback.good_points.length > 0 ? (
               <ul className="space-y-2">
                 {feedback.good_points.map((point, index) => (
-                  <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
+                  <li key={index} className="flex items-start gap-2 text-[var(--text-secondary)]">
                     <svg
-                      className="w-5 h-5 text-lc-green flex-shrink-0 mt-0.5"
+                      className="w-5 h-5 text-[#4CAF50] flex-shrink-0 mt-0.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -490,19 +473,19 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted">No specific strengths identified</p>
+              <p className="text-[var(--text-muted)]">No specific strengths identified</p>
             )}
           </div>
 
           {/* Areas for Improvement */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-yellow mb-4">Areas for Improvement</h3>
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-[#E65100] mb-4">Areas for Improvement</h3>
             {feedback.areas_for_improvement.length > 0 ? (
               <ul className="space-y-2">
                 {feedback.areas_for_improvement.map((area, index) => (
-                  <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
+                  <li key={index} className="flex items-start gap-2 text-[var(--text-secondary)]">
                     <svg
-                      className="w-5 h-5 text-lc-yellow flex-shrink-0 mt-0.5"
+                      className="w-5 h-5 text-[#FF9800] flex-shrink-0 mt-0.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -519,7 +502,7 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted">No improvements identified</p>
+              <p className="text-[var(--text-muted)]">No improvements identified</p>
             )}
           </div>
         </div>
@@ -527,13 +510,13 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
       {/* Missed Components */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.missed_components.length > 0 && (
-        <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-          <h3 className="text-lg font-semibold text-lc-red mb-4">Missed Components</h3>
+        <div className="card p-6 mb-8">
+          <h3 className="text-lg font-semibold text-[#C62828] mb-4">Missed Components</h3>
           <ul className="space-y-2">
             {feedback.missed_components.map((component, index) => (
-              <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
+              <li key={index} className="flex items-start gap-2 text-[var(--text-secondary)]">
                 <svg
-                  className="w-5 h-5 text-lc-red flex-shrink-0 mt-0.5"
+                  className="w-5 h-5 text-[#C62828] flex-shrink-0 mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -554,8 +537,8 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
       {/* Detailed Notes by Category */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.detailed_notes && (
-        <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-          <h3 className="text-lg font-semibold mb-4">Detailed Feedback by Category</h3>
+        <div className="card p-6 mb-8">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Detailed Feedback by Category</h3>
           <div className="space-y-4">
             {[
               { key: 'requirements', label: 'Requirements Gathering' },
@@ -569,9 +552,9 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
               const note = feedback.detailed_notes[key as keyof typeof feedback.detailed_notes]
               if (!note) return null
               return (
-                <div key={key} className="border-l-2 border-lc-border pl-4">
-                  <h4 className="text-sm font-semibold text-lc-text-muted mb-1">{label}</h4>
-                  <p className="text-lc-text-secondary">{note}</p>
+                <div key={key} className="border-l-2 border-[var(--accent-purple)] pl-4">
+                  <h4 className="text-sm font-semibold text-[var(--text-muted)] mb-1">{label}</h4>
+                  <p className="text-[var(--text-secondary)]">{note}</p>
                 </div>
               )
             })}
@@ -581,13 +564,13 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
       {/* Study Recommendations */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.study_recommendations.length > 0 && (
-        <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-          <h3 className="text-lg font-semibold text-lc-teal mb-4">What to Study Next</h3>
+        <div className="card p-6 mb-8">
+          <h3 className="text-lg font-semibold text-[var(--accent-purple)] mb-4">What to Study Next</h3>
           <ul className="space-y-2">
             {feedback.study_recommendations.map((rec, index) => (
-              <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
+              <li key={index} className="flex items-start gap-2 text-[var(--text-secondary)]">
                 <svg
-                  className="w-5 h-5 text-lc-teal flex-shrink-0 mt-0.5"
+                  className="w-5 h-5 text-[var(--accent-purple)] flex-shrink-0 mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -608,9 +591,9 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
       {/* Key Takeaway */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.key_takeaway && (
-        <div className="bg-gradient-to-r from-brand-orange/10 to-lc-teal/10 border border-brand-orange/30 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-semibold text-brand-orange mb-2">Key Takeaway</h3>
-          <p className="text-lc-text-primary text-lg">{feedback.key_takeaway}</p>
+        <div className="bg-[#F3E5F5] border border-[var(--accent-purple)] rounded-xl p-6 mb-8">
+          <h3 className="text-lg font-semibold text-[var(--accent-purple)] mb-2">Key Takeaway</h3>
+          <p className="text-[var(--text-primary)] text-lg">{feedback.key_takeaway}</p>
         </div>
       )}
     </>
@@ -625,27 +608,27 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
     <>
       {/* Overall Result */}
       <div
-        className={`mb-8 p-6 rounded-lg text-center ${
+        className={`mb-8 p-6 rounded-xl text-center ${
           evaluation.verdict === 'PASS'
-            ? 'bg-lc-green/10 border border-lc-green/30'
-            : 'bg-lc-red/10 border border-lc-red/30'
+            ? 'bg-[#E8F5E9] border border-[#4CAF50]'
+            : 'bg-[#FFEBEE] border border-[#C62828]'
         }`}
       >
         <div
           className={`text-4xl font-bold mb-2 ${
-            evaluation.verdict === 'PASS' ? 'text-lc-green' : 'text-lc-red'
+            evaluation.verdict === 'PASS' ? 'score-success' : 'score-error'
           }`}
         >
           {evaluation.verdict === 'PASS' ? 'PASSED' : 'NEEDS IMPROVEMENT'}
         </div>
-        <div className="text-lg text-lc-text-secondary">
+        <div className="text-lg text-[var(--text-secondary)]">
           Overall Score: {evaluation.overall_score}/100
         </div>
       </div>
 
       {/* Score Breakdown */}
-      <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-        <h3 className="text-lg font-semibold mb-4">Score Breakdown</h3>
+      <div className="card p-6 mb-8">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Score Breakdown</h3>
         <div className="grid grid-cols-2 gap-4">
           {[
             { label: 'Test Case Coverage', score: evaluation.test_case_coverage_score, description: 'How many test cases passed' },
@@ -658,23 +641,23 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
           ].map(({ label, score, description }) => (
             <div key={label} className="flex items-center justify-between group relative">
               <div>
-                <span className="text-lc-text-secondary">{label}</span>
-                <p className="text-xs text-lc-text-muted">{description}</p>
+                <span className="text-[var(--text-secondary)]">{label}</span>
+                <p className="text-xs text-[var(--text-muted)]">{description}</p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-24 h-2 bg-lc-bg-layer-2 rounded-full overflow-hidden">
+                <div className="progress-bar w-24">
                   <div
                     className={`h-full rounded-full ${
                       (score || 0) >= 70
-                        ? 'bg-lc-green'
+                        ? 'bg-[#4CAF50]'
                         : (score || 0) >= 50
-                        ? 'bg-lc-yellow'
-                        : 'bg-lc-red'
+                        ? 'bg-[#FF9800]'
+                        : 'bg-[#C62828]'
                     }`}
                     style={{ width: `${score || 0}%` }}
                   />
                 </div>
-                <span className="text-sm text-lc-text-secondary w-8 text-right">{score || 0}</span>
+                <span className="text-sm text-[var(--text-secondary)] w-8 text-right">{score || 0}</span>
               </div>
             </div>
           ))}
@@ -685,14 +668,14 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
       {feedback && !isSystemDesignFeedback(feedback) && (
         <div className="grid grid-cols-2 gap-6 mb-8">
           {/* Strengths */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-green mb-4">Strengths</h3>
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-[#2E7D32] mb-4">Strengths</h3>
             {feedback.strengths.length > 0 ? (
               <ul className="space-y-2">
                 {feedback.strengths.map((strength, index) => (
-                  <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
+                  <li key={index} className="flex items-start gap-2 text-[var(--text-secondary)]">
                     <svg
-                      className="w-5 h-5 text-lc-green flex-shrink-0 mt-0.5"
+                      className="w-5 h-5 text-[#4CAF50] flex-shrink-0 mt-0.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -709,21 +692,21 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted">No strengths identified</p>
+              <p className="text-[var(--text-muted)]">No strengths identified</p>
             )}
           </div>
 
           {/* Areas for Improvement */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-yellow mb-4">
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-[#E65100] mb-4">
               Areas for Improvement
             </h3>
             {feedback.improvements.length > 0 ? (
               <ul className="space-y-2">
                 {feedback.improvements.map((improvement, index) => (
-                  <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
+                  <li key={index} className="flex items-start gap-2 text-[var(--text-secondary)]">
                     <svg
-                      className="w-5 h-5 text-lc-yellow flex-shrink-0 mt-0.5"
+                      className="w-5 h-5 text-[#FF9800] flex-shrink-0 mt-0.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -740,7 +723,7 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted">No improvements identified</p>
+              <p className="text-[var(--text-muted)]">No improvements identified</p>
             )}
           </div>
         </div>
@@ -748,9 +731,9 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
 
       {/* Detailed Notes */}
       {feedback && !isSystemDesignFeedback(feedback) && feedback.detailed_notes && (
-        <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-          <h3 className="text-lg font-semibold mb-4">Detailed Feedback</h3>
-          <p className="text-lc-text-secondary whitespace-pre-wrap">
+        <div className="card p-6 mb-8">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Detailed Feedback</h3>
+          <p className="text-[var(--text-secondary)] whitespace-pre-wrap">
             {feedback.detailed_notes}
           </p>
         </div>

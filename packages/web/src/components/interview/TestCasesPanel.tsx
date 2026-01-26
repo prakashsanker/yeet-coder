@@ -57,15 +57,15 @@ export default function TestCasesPanel({
   const totalCount = results.length
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-white rounded-lg overflow-hidden border border-[rgba(0,0,0,0.08)]">
       {/* Tab Header */}
-      <div className="flex items-center border-b border-gray-700">
+      <div className="flex items-center border-b border-[rgba(0,0,0,0.08)] bg-[var(--bg-section)]">
         <button
           onClick={() => setActiveTab('cases')}
           className={`px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'cases'
-              ? 'text-white border-b-2 border-primary-500'
-              : 'text-gray-400 hover:text-gray-200'
+              ? 'text-[var(--text-primary)] border-b-2 border-[var(--accent-purple)]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
           }`}
         >
           Test Cases
@@ -74,8 +74,8 @@ export default function TestCasesPanel({
           onClick={() => setActiveTab('results')}
           className={`px-4 py-2 text-sm font-medium transition-colors ${
             activeTab === 'results'
-              ? 'text-white border-b-2 border-primary-500'
-              : 'text-gray-400 hover:text-gray-200'
+              ? 'text-[var(--text-primary)] border-b-2 border-[var(--accent-purple)]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
           }`}
         >
           Results
@@ -83,8 +83,8 @@ export default function TestCasesPanel({
             <span
               className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
                 passedCount === totalCount
-                  ? 'bg-green-600 text-white'
-                  : 'bg-red-600 text-white'
+                  ? 'bg-[#4CAF50] text-white'
+                  : 'bg-[#C62828] text-white'
               }`}
             >
               {passedCount}/{totalCount}
@@ -101,18 +101,18 @@ export default function TestCasesPanel({
             {testCases.map((testCase, index) => (
               <div
                 key={`builtin-${index}`}
-                className="bg-gray-700 rounded-lg p-3 space-y-2"
+                className="bg-[var(--bg-section)] rounded-lg p-3 space-y-2 border border-[rgba(0,0,0,0.08)]"
               >
-                <div className="text-sm text-gray-400">Case {index + 1}</div>
+                <div className="text-sm text-[var(--text-muted)]">Case {index + 1}</div>
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-500">Input:</div>
-                  <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                  <div className="text-xs text-[var(--text-muted)]">Input:</div>
+                  <pre className="text-sm text-[var(--text-primary)] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                     {testCase.input}
                   </pre>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-500">Expected Output:</div>
-                  <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                  <div className="text-xs text-[var(--text-muted)]">Expected Output:</div>
+                  <pre className="text-sm text-[var(--text-primary)] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                     {testCase.expected_output}
                   </pre>
                 </div>
@@ -123,13 +123,13 @@ export default function TestCasesPanel({
             {customTestCases.map((testCase, index) => (
               <div
                 key={`custom-${index}`}
-                className="bg-gray-700 rounded-lg p-3 space-y-2 border border-blue-600/50"
+                className="bg-[var(--bg-section)] rounded-lg p-3 space-y-2 border border-[var(--accent-blue)]"
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-blue-400">Custom Case {index + 1}</div>
+                  <div className="text-sm text-[var(--accent-blue)]">Custom Case {index + 1}</div>
                   <button
                     onClick={() => handleRemoveCustomTestCase(index)}
-                    className="text-gray-400 hover:text-red-400 transition-colors"
+                    className="text-[var(--text-muted)] hover:text-[#C62828] transition-colors"
                     title="Remove test case"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,14 +138,14 @@ export default function TestCasesPanel({
                   </button>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-500">Input:</div>
-                  <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                  <div className="text-xs text-[var(--text-muted)]">Input:</div>
+                  <pre className="text-sm text-[var(--text-primary)] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                     {testCase.input || '(empty)'}
                   </pre>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-500">Expected Output:</div>
-                  <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                  <div className="text-xs text-[var(--text-muted)]">Expected Output:</div>
+                  <pre className="text-sm text-[var(--text-primary)] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                     {testCase.expected_output || '(empty)'}
                   </pre>
                 </div>
@@ -154,32 +154,32 @@ export default function TestCasesPanel({
 
             {/* Add test case form */}
             {isAddingTestCase ? (
-              <div className="bg-gray-700 rounded-lg p-3 space-y-3 border border-blue-600">
-                <div className="text-sm text-blue-400">Add Custom Test Case</div>
+              <div className="bg-[var(--bg-section)] rounded-lg p-3 space-y-3 border border-[var(--accent-blue)]">
+                <div className="text-sm text-[var(--accent-blue)]">Add Custom Test Case</div>
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-500">Input:</div>
+                  <div className="text-xs text-[var(--text-muted)]">Input:</div>
                   <textarea
                     value={newInput}
                     onChange={(e) => setNewInput(e.target.value)}
                     placeholder="Enter input..."
-                    className="w-full text-sm text-gray-200 bg-gray-800 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full text-sm text-[var(--text-primary)] bg-white rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent-blue)] border border-[rgba(0,0,0,0.08)] font-mono"
                     rows={2}
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-xs text-gray-500">Expected Output:</div>
+                  <div className="text-xs text-[var(--text-muted)]">Expected Output:</div>
                   <textarea
                     value={newExpectedOutput}
                     onChange={(e) => setNewExpectedOutput(e.target.value)}
                     placeholder="Enter expected output..."
-                    className="w-full text-sm text-gray-200 bg-gray-800 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full text-sm text-[var(--text-primary)] bg-white rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent-blue)] border border-[rgba(0,0,0,0.08)] font-mono"
                     rows={2}
                   />
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleAddTestCase}
-                    className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm bg-[var(--accent-blue)] hover:opacity-90 text-white rounded-lg transition-colors"
                   >
                     Add
                   </button>
@@ -189,7 +189,7 @@ export default function TestCasesPanel({
                       setNewInput('')
                       setNewExpectedOutput('')
                     }}
-                    className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-sm bg-[var(--bg-section)] hover:bg-[rgba(0,0,0,0.05)] text-[var(--text-secondary)] rounded-lg transition-colors border border-[rgba(0,0,0,0.08)]"
                   >
                     Cancel
                   </button>
@@ -198,7 +198,7 @@ export default function TestCasesPanel({
             ) : (
               <button
                 onClick={() => setIsAddingTestCase(true)}
-                className="w-full py-2 border border-dashed border-gray-600 rounded-lg text-gray-400 hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2 border border-dashed border-[rgba(0,0,0,0.15)] rounded-lg text-[var(--text-muted)] hover:border-[var(--accent-blue)] hover:text-[var(--accent-blue)] transition-colors flex items-center justify-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -208,7 +208,7 @@ export default function TestCasesPanel({
             )}
 
             {allTestCases.length === 0 && !isAddingTestCase && (
-              <div className="text-gray-400 text-sm text-center py-4">
+              <div className="text-[var(--text-muted)] text-sm text-center py-4">
                 No test cases yet. Add your own above.
               </div>
             )}
@@ -220,15 +220,15 @@ export default function TestCasesPanel({
                 key={index}
                 className={`rounded-lg p-3 space-y-2 ${
                   result.passed
-                    ? 'bg-green-900/30 border border-green-700'
-                    : 'bg-red-900/30 border border-red-700'
+                    ? 'bg-[#E8F5E9] border border-[#4CAF50]'
+                    : 'bg-[#FFEBEE] border border-[#C62828]'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {result.passed ? (
                       <svg
-                        className="w-5 h-5 text-green-500"
+                        className="w-5 h-5 text-[#4CAF50]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -242,7 +242,7 @@ export default function TestCasesPanel({
                       </svg>
                     ) : (
                       <svg
-                        className="w-5 h-5 text-red-500"
+                        className="w-5 h-5 text-[#C62828]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -255,12 +255,12 @@ export default function TestCasesPanel({
                         />
                       </svg>
                     )}
-                    <span className="text-sm text-gray-200">
+                    <span className="text-sm text-[var(--text-primary)]">
                       Case {index + 1}
                     </span>
                   </div>
                   {result.executionTime && (
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-[var(--text-muted)]">
                       {result.executionTime}ms
                     </span>
                   )}
@@ -268,30 +268,30 @@ export default function TestCasesPanel({
 
                 {result.error ? (
                   <div className="space-y-1">
-                    <div className="text-xs text-red-400">Error:</div>
-                    <pre className="text-sm text-red-300 bg-gray-800 rounded p-2 overflow-x-auto">
+                    <div className="text-xs text-[#C62828]">Error:</div>
+                    <pre className="text-sm text-[#C62828] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                       {result.error}
                     </pre>
                   </div>
                 ) : (
                   <>
                     <div className="space-y-1">
-                      <div className="text-xs text-gray-500">Input:</div>
-                      <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                      <div className="text-xs text-[var(--text-muted)]">Input:</div>
+                      <pre className="text-sm text-[var(--text-primary)] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                         {result.testCase.input}
                       </pre>
                     </div>
                     <div className="space-y-1">
-                      <div className="text-xs text-gray-500">Expected:</div>
-                      <pre className="text-sm text-gray-200 bg-gray-800 rounded p-2 overflow-x-auto">
+                      <div className="text-xs text-[var(--text-muted)]">Expected:</div>
+                      <pre className="text-sm text-[var(--text-primary)] bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono">
                         {result.testCase.expected_output}
                       </pre>
                     </div>
                     <div className="space-y-1">
-                      <div className="text-xs text-gray-500">Your Output:</div>
+                      <div className="text-xs text-[var(--text-muted)]">Your Output:</div>
                       <pre
-                        className={`text-sm bg-gray-800 rounded p-2 overflow-x-auto ${
-                          result.passed ? 'text-green-400' : 'text-red-400'
+                        className={`text-sm bg-white rounded p-2 overflow-x-auto border border-[rgba(0,0,0,0.08)] font-mono ${
+                          result.passed ? 'text-[#2E7D32]' : 'text-[#C62828]'
                         }`}
                       >
                         {result.actualOutput ?? '(no output)'}
@@ -302,7 +302,7 @@ export default function TestCasesPanel({
               </div>
             ))}
             {results.length === 0 && (
-              <div className="text-gray-400 text-sm text-center py-8">
+              <div className="text-[var(--text-muted)] text-sm text-center py-8">
                 Run your code to see results
               </div>
             )}
@@ -311,11 +311,11 @@ export default function TestCasesPanel({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 p-4 border-t border-gray-700">
+      <div className="flex gap-3 p-4 border-t border-[rgba(0,0,0,0.08)]">
         <button
           onClick={onRun}
           disabled={isRunning}
-          className="flex-1 py-2 px-4 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+          className="flex-1 py-2 px-4 bg-[var(--bg-section)] hover:bg-[rgba(0,0,0,0.05)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] font-medium rounded-lg transition-colors flex items-center justify-center gap-2 border border-[rgba(0,0,0,0.08)]"
         >
           {isRunning ? (
             <>
@@ -368,7 +368,7 @@ export default function TestCasesPanel({
         <button
           onClick={onSubmit}
           disabled={isRunning}
-          className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium rounded-lg transition-colors"
+          className="flex-1 py-2 px-4 bg-[#4CAF50] hover:bg-[#388E3C] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
         >
           Submit
         </button>

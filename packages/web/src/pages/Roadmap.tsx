@@ -119,21 +119,21 @@ export default function Roadmap() {
   }
 
   const getProgressColor = (completed: number, total: number) => {
-    if (total === 0) return 'bg-lc-bg-layer-3'
+    if (total === 0) return 'bg-[rgba(0,0,0,0.08)]'
     const ratio = completed / total
-    if (ratio === 1) return 'bg-lc-green'
-    if (ratio >= 0.5) return 'bg-lc-yellow'
-    if (ratio > 0) return 'bg-brand-orange'
-    return 'bg-lc-bg-layer-3'
+    if (ratio === 1) return 'bg-[#4CAF50]'
+    if (ratio >= 0.5) return 'bg-[#FF9800]'
+    if (ratio > 0) return 'bg-[var(--accent-purple)]'
+    return 'bg-[rgba(0,0,0,0.08)]'
   }
 
   const getBorderColor = (completed: number, total: number) => {
-    if (total === 0) return 'border-lc-border'
+    if (total === 0) return 'border-[rgba(0,0,0,0.08)]'
     const ratio = completed / total
-    if (ratio === 1) return 'border-lc-green'
-    if (ratio >= 0.5) return 'border-lc-yellow'
-    if (ratio > 0) return 'border-brand-orange'
-    return 'border-lc-border'
+    if (ratio === 1) return 'border-[#4CAF50]'
+    if (ratio >= 0.5) return 'border-[#FF9800]'
+    if (ratio > 0) return 'border-[var(--accent-purple)]'
+    return 'border-[rgba(0,0,0,0.08)]'
   }
 
   const handleTopicClick = (topic: TopicWithProgress) => {
@@ -158,13 +158,13 @@ export default function Roadmap() {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'easy':
-        return 'text-lc-green'
+        return 'text-[#2E7D32]'
       case 'medium':
-        return 'text-lc-yellow'
+        return 'text-[#E65100]'
       case 'hard':
-        return 'text-lc-red'
+        return 'text-[#C62828]'
       default:
-        return 'text-lc-text-muted'
+        return 'text-[var(--text-muted)]'
     }
   }
 
@@ -172,12 +172,12 @@ export default function Roadmap() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-lc-bg-dark">
+      <div className="app-page">
         <AppHeader />
         <div className="flex items-center justify-center py-24">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-orange mx-auto mb-4"></div>
-            <p className="text-lc-text-muted">Loading roadmap...</p>
+            <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+            <p className="text-[var(--text-muted)]">Loading roadmap...</p>
           </div>
         </div>
       </div>
@@ -185,16 +185,16 @@ export default function Roadmap() {
   }
 
   return (
-    <div className="min-h-screen bg-lc-bg-dark">
+    <div className="app-page">
       <AppHeader />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-lc-text-primary mb-2">
+          <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">
             {userIsAdmin ? 'Interview Roadmap' : 'System Design Roadmap'}
           </h1>
-          <p className="text-lc-text-secondary">
+          <p className="text-[var(--text-secondary)]">
             {userIsAdmin
               ? 'Follow this structured path to master coding and system design interviews'
               : 'Follow this structured path to master system design interviews'
@@ -210,10 +210,10 @@ export default function Roadmap() {
                 setActiveType('coding')
                 setSelectedTopic(null)
               }}
-              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-6 py-2 rounded-xl font-medium transition-colors ${
                 activeType === 'coding'
-                  ? 'bg-brand-orange text-white'
-                  : 'bg-lc-bg-layer-1 text-lc-text-secondary hover:bg-lc-bg-layer-2'
+                  ? 'btn-primary'
+                  : 'btn-secondary'
               }`}
             >
               Coding (NeetCode 150)
@@ -224,10 +224,10 @@ export default function Roadmap() {
               setActiveType('system_design')
               setSelectedTopic(null)
             }}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-6 py-2 rounded-xl font-medium transition-colors ${
               activeType === 'system_design'
-                ? 'bg-brand-orange text-white'
-                : 'bg-lc-bg-layer-1 text-lc-text-secondary hover:bg-lc-bg-layer-2'
+                ? 'btn-primary'
+                : 'btn-secondary'
             }`}
           >
             System Design
@@ -236,18 +236,18 @@ export default function Roadmap() {
 
         {/* Progress Overview */}
         {user && (
-          <div className="bg-lc-bg-layer-1 rounded-lg border border-lc-border p-4 mb-8">
+          <div className="card p-4 mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-lc-text-muted text-sm">Overall Progress</span>
+                <span className="text-[var(--text-muted)] text-sm">Overall Progress</span>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-2xl font-bold text-lc-text-primary">
+                  <span className="text-2xl font-bold text-[var(--text-primary)]">
                     {topics
                       .filter(t => activeType === 'coding' ? t.type === 'coding' : t.type === 'system_design')
                       .reduce((sum, t) => sum + t.completedCount, 0)}
                   </span>
-                  <span className="text-lc-text-muted">/</span>
-                  <span className="text-lc-text-secondary">
+                  <span className="text-[var(--text-muted)]">/</span>
+                  <span className="text-[var(--text-secondary)]">
                     {topics
                       .filter(t => activeType === 'coding' ? t.type === 'coding' : t.type === 'system_design')
                       .reduce((sum, t) => sum + t.totalCount, 0)} problems
@@ -256,16 +256,16 @@ export default function Roadmap() {
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-lc-green"></div>
-                  <span className="text-lc-text-muted">Complete</span>
+                  <div className="w-3 h-3 rounded-full bg-[#4CAF50]"></div>
+                  <span className="text-[var(--text-muted)]">Complete</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-brand-orange"></div>
-                  <span className="text-lc-text-muted">In Progress</span>
+                  <div className="w-3 h-3 rounded-full bg-[var(--accent-purple)]"></div>
+                  <span className="text-[var(--text-muted)]">In Progress</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-lc-bg-layer-3"></div>
-                  <span className="text-lc-text-muted">Not Started</span>
+                  <div className="w-3 h-3 rounded-full bg-[rgba(0,0,0,0.08)]"></div>
+                  <span className="text-[var(--text-muted)]">Not Started</span>
                 </div>
               </div>
             </div>
@@ -290,8 +290,8 @@ export default function Roadmap() {
                         onClick={() => handleTopicClick(topic)}
                         className={`relative group min-w-[160px] p-4 rounded-xl border-2 transition-all hover:scale-105 ${
                           isSelected
-                            ? 'border-brand-orange bg-brand-orange/10'
-                            : `${getBorderColor(topic.completedCount, topic.totalCount)} bg-lc-bg-layer-1 hover:bg-lc-bg-layer-2`
+                            ? 'border-[var(--accent-purple)] bg-[#F3E5F5]'
+                            : `${getBorderColor(topic.completedCount, topic.totalCount)} bg-white hover:bg-[var(--bg-section)] shadow-sm`
                         }`}
                       >
                         {/* Progress indicator */}
@@ -299,10 +299,10 @@ export default function Roadmap() {
                           <div className="absolute -top-2 -right-2">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                               topic.completedCount === topic.totalCount
-                                ? 'bg-lc-green text-white'
+                                ? 'bg-[#4CAF50] text-white'
                                 : topic.completedCount > 0
-                                ? 'bg-brand-orange text-white'
-                                : 'bg-lc-bg-layer-3 text-lc-text-muted'
+                                ? 'bg-[var(--accent-purple)] text-white'
+                                : 'bg-[rgba(0,0,0,0.08)] text-[var(--text-muted)]'
                             }`}>
                               {topic.completedCount === topic.totalCount ? '✓' : topic.completedCount}
                             </div>
@@ -310,10 +310,10 @@ export default function Roadmap() {
                         )}
 
                         <div className="text-center">
-                          <h3 className="font-medium text-lc-text-primary text-sm mb-1">
+                          <h3 className="font-medium text-[var(--text-primary)] text-sm mb-1">
                             {topic.name}
                           </h3>
-                          <p className="text-xs text-lc-text-muted">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {topic.totalCount > 0
                               ? `${topic.completedCount}/${topic.totalCount} done`
                               : 'No questions yet'
@@ -322,7 +322,7 @@ export default function Roadmap() {
 
                           {/* Progress bar */}
                           {topic.totalCount > 0 && (
-                            <div className="mt-2 h-1 bg-lc-bg-layer-3 rounded-full overflow-hidden">
+                            <div className="mt-2 h-1 bg-[rgba(0,0,0,0.08)] rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${getProgressColor(topic.completedCount, topic.totalCount)}`}
                                 style={{ width: `${(topic.completedCount / topic.totalCount) * 100}%` }}
@@ -340,14 +340,14 @@ export default function Roadmap() {
 
           {/* Question Panel */}
           {selectedTopic && (
-            <div className="w-96 bg-lc-bg-layer-1 rounded-lg border border-lc-border p-4 h-fit sticky top-4">
+            <div className="w-96 card p-4 h-fit sticky top-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-lc-text-primary">
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                   {selectedTopic.name}
                 </h2>
                 <button
                   onClick={() => setSelectedTopic(null)}
-                  className="text-lc-text-muted hover:text-lc-text-primary"
+                  className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -356,18 +356,18 @@ export default function Roadmap() {
               </div>
 
               {selectedTopic.description && (
-                <p className="text-sm text-lc-text-muted mb-4">
+                <p className="text-sm text-[var(--text-muted)] mb-4">
                   {selectedTopic.description}
                 </p>
               )}
 
-              <div className="text-sm text-lc-text-muted mb-3">
+              <div className="text-sm text-[var(--text-muted)] mb-3">
                 {selectedTopic.completedCount}/{selectedTopic.totalCount} completed
               </div>
 
               {selectedTopic.questions.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-lc-text-muted">No questions available yet</p>
+                  <p className="text-[var(--text-muted)]">No questions available yet</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[60vh] overflow-y-auto">
@@ -385,21 +385,21 @@ export default function Roadmap() {
                         <button
                           key={question.id}
                           onClick={() => handleStartPractice(question)}
-                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                          className={`w-full text-left p-3 rounded-xl border transition-colors ${
                             completed
-                              ? 'border-lc-green/30 bg-lc-green/5 hover:bg-lc-green/10'
-                              : 'border-lc-border bg-lc-bg-layer-2 hover:bg-lc-bg-layer-3'
+                              ? 'border-[#4CAF50] bg-[#E8F5E9] hover:bg-[#C8E6C9]'
+                              : 'border-[rgba(0,0,0,0.08)] bg-[var(--bg-section)] hover:bg-white'
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             {completed && (
-                              <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-[#4CAF50] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                             )}
-                            <span className={`text-sm ${completed ? 'text-lc-text-secondary' : 'text-lc-text-primary'}`}>
+                            <span className={`text-sm ${completed ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>
                               {question.leetcode_number && (
-                                <span className="text-lc-text-muted mr-1">{question.leetcode_number}.</span>
+                                <span className="text-[var(--text-muted)] mr-1">{question.leetcode_number}.</span>
                               )}
                               {question.title}
                             </span>
@@ -409,7 +409,7 @@ export default function Roadmap() {
                               {question.difficulty}
                             </span>
                             {score !== undefined && (
-                              <span className={`text-xs ${score >= 70 ? 'text-lc-green' : score >= 50 ? 'text-lc-yellow' : 'text-lc-red'}`}>
+                              <span className={`text-xs ${score >= 70 ? 'score-success' : score >= 50 ? 'score-warning' : 'score-error'}`}>
                                 {score}/100
                               </span>
                             )}
@@ -425,7 +425,7 @@ export default function Roadmap() {
 
         {/* Empty state when no topic selected */}
         {!selectedTopic && (
-          <div className="text-center py-8 text-lc-text-muted">
+          <div className="text-center py-8 text-[var(--text-muted)]">
             Click on a topic to see its questions
           </div>
         )}
