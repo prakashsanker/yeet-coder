@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
 import { api } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { isAdmin } from '../lib/admin'
 
 interface SubscriptionDetails {
   tier: 'free' | 'pro'
@@ -14,6 +15,7 @@ interface SubscriptionDetails {
 export default function Subscription() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const userIsAdmin = isAdmin(user)
 
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -129,7 +131,7 @@ export default function Subscription() {
                     <ul className="list-disc list-inside space-y-1 text-lc-text-muted">
                       <li>Unlimited mock interviews</li>
                       <li>Detailed AI feedback</li>
-                      <li>Access to NeetCode 150 + System Design</li>
+                      <li>Access to {userIsAdmin ? 'NeetCode 150 + System Design' : 'System Design'}</li>
                       <li>Progress tracking</li>
                     </ul>
                   </div>

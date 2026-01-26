@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { analytics } from '../../lib/posthog'
+import { useAuth } from '../../contexts/AuthContext'
+import { isAdmin } from '../../lib/admin'
 
 interface PaywallModalProps {
   isOpen: boolean
@@ -18,6 +20,8 @@ export default function PaywallModal({
   existingInterview,
 }: PaywallModalProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const userIsAdmin = isAdmin(user)
   const [isLoading, setIsLoading] = useState(false)
 
   // Track paywall shown
@@ -111,7 +115,7 @@ export default function PaywallModal({
               <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Full access to NeetCode 150 + System Design
+              Full access to {userIsAdmin ? 'NeetCode 150 + System Design' : 'System Design'}
             </li>
             <li className="flex items-center gap-2 text-sm text-lc-text-secondary">
               <svg className="w-4 h-4 text-lc-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
