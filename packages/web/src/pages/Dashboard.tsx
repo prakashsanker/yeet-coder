@@ -4,6 +4,7 @@ import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
 import { api, type Question, type Evaluation, type InterviewSession, type Topic } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { isAdmin } from '../lib/admin'
 import { analytics } from '../lib/posthog'
 
 type Tab = 'neetcode' | 'system_design' | 'history'
@@ -48,7 +49,9 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<Tab>('neetcode')
+  const userIsAdmin = isAdmin(user)
+  // Non-admin users default to system_design tab (NeetCode tab is hidden for them)
+  const [activeTab, setActiveTab] = useState<Tab>(userIsAdmin ? 'neetcode' : 'system_design')
   const [questions, setQuestions] = useState<Question[]>([])
   const [evaluations, setEvaluations] = useState<EvaluationWithInterview[]>([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true)
@@ -62,6 +65,14 @@ export default function Dashboard() {
   const [isLoadingRoadmap, setIsLoadingRoadmap] = useState(true)
   const hasLoadedRoadmapRef = useRef(false)
   const [showPaywall, setShowPaywall] = useState(false)
+
+  // Ensure non-admin users can't access neetcode tab
+  // This handles race conditions where user loads after initial render
+  useEffect(() => {
+    if (user && !userIsAdmin && activeTab === 'neetcode') {
+      setActiveTab('system_design')
+    }
+  }, [user, userIsAdmin, activeTab])
 
   // Handle upgrade success query param
   useEffect(() => {
@@ -351,10 +362,13 @@ export default function Dashboard() {
         {/* Main CTA */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-lc-text-primary mb-4">
-            Practice Interview Questions
+            {userIsAdmin ? 'Practice Interview Questions' : 'Practice System Design'}
           </h1>
           <p className="text-lc-text-secondary mb-6">
-            Master system design and coding interviews with AI-powered feedback
+            {userIsAdmin
+              ? 'Master system design and coding interviews with AI-powered feedback'
+              : 'Master system design interviews with AI-powered feedback'
+            }
           </p>
           <button
             onClick={() => navigate('/onboarding')}
@@ -366,21 +380,23 @@ export default function Dashboard() {
 
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-6 border-b border-lc-border">
-          <button
-            onClick={() => setActiveTab('neetcode')}
-            className={`px-4 py-3 text-sm font-medium transition-colors relative ${
-              activeTab === 'neetcode'
-                ? 'text-lc-text-primary'
-                : 'text-lc-text-muted hover:text-lc-text-secondary'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <span>NeetCode 150</span>
-            </span>
-            {activeTab === 'neetcode' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-orange" />
-            )}
-          </button>
+          {userIsAdmin && (
+            <button
+              onClick={() => setActiveTab('neetcode')}
+              className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                activeTab === 'neetcode'
+                  ? 'text-lc-text-primary'
+                  : 'text-lc-text-muted hover:text-lc-text-secondary'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span>NeetCode 150</span>
+              </span>
+              {activeTab === 'neetcode' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-orange" />
+              )}
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('system_design')}
             className={`px-4 py-3 text-sm font-medium transition-colors relative ${
@@ -424,7 +440,7 @@ export default function Dashboard() {
             Resources to prepare for system design interviews. Practice designing scalable systems.
           </p>
         )}
-        {activeTab === 'neetcode' && (
+        {activeTab === 'neetcode' && userIsAdmin && (
           <p className="text-lc-text-muted text-sm mb-6">
             The NeetCode 150 - a curated list of the most important LeetCode problems.
           </p>
@@ -513,8 +529,8 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        ) : activeTab === 'neetcode' ? (
-          // NeetCode 150 Roadmap
+        ) : activeTab === 'neetcode' && userIsAdmin ? (
+          // NeetCode 150 Roadmap (admin only)
           <div>
             {isLoadingRoadmap ? (
               <div className="text-center py-12">
