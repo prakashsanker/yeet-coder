@@ -4,6 +4,7 @@ import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
 import { api, type Question, type Evaluation, type InterviewSession, type Topic } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { isAdmin } from '../lib/admin'
 import { analytics } from '../lib/posthog'
 
 type Tab = 'neetcode' | 'system_design' | 'history'
@@ -43,7 +44,9 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<Tab>('neetcode')
+  const userIsAdmin = isAdmin(user)
+  // Non-admin users default to system_design tab (NeetCode tab is hidden for them)
+  const [activeTab, setActiveTab] = useState<Tab>(userIsAdmin ? 'neetcode' : 'system_design')
   const [questions, setQuestions] = useState<Question[]>([])
   const [evaluations, setEvaluations] = useState<EvaluationWithInterview[]>([])
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(true)
@@ -57,6 +60,15 @@ export default function Dashboard() {
   const hasLoadedRoadmapRef = useRef(false)
   const [showPaywall, setShowPaywall] = useState(false)
 
+  // Ensure non-admin users can't access neetcode tab
+  // This handles race conditions where user loads after initial render
+  useEffect(() => {
+    if (user && !userIsAdmin && activeTab === 'neetcode') {
+      setActiveTab('system_design')
+    }
+  }, [user, userIsAdmin, activeTab])
+
+  // Handle upgrade success query param
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {
       analytics.upgradeSuccessful()
@@ -271,10 +283,13 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight">
-              Practice Interview Questions
+              {userIsAdmin ? 'Practice Interview Questions' : 'Practice System Design'}
             </h1>
             <p className="text-[var(--text-secondary)] mt-1">
-              Master system design and coding interviews with AI-powered feedback
+              {userIsAdmin
+                ? 'Master system design and coding interviews with AI-powered feedback'
+                : 'Master system design interviews with AI-powered feedback'
+              }
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -324,32 +339,43 @@ export default function Dashboard() {
 
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-6 border-b border-[rgba(0,0,0,0.1)]">
-          {[
-            { id: 'neetcode' as Tab, label: 'NeetCode 150' },
-            { id: 'system_design' as Tab, label: 'System Design' },
-            { id: 'history' as Tab, label: 'Past Submissions', badge: evaluations.length > 0 ? evaluations.length : undefined },
-          ].map(tab => (
+          {userIsAdmin && (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`tab ${activeTab === tab.id ? 'tab-active' : ''}`}
+              onClick={() => setActiveTab('neetcode')}
+              className={`tab ${activeTab === 'neetcode' ? 'tab-active' : ''}`}
             >
               <span className="flex items-center gap-2">
-                {tab.label}
-                {tab.badge && (
-                  <span className="badge badge-neutral">
-                    {tab.badge}
-                  </span>
-                )}
+                NeetCode 150
               </span>
             </button>
-          ))}
+          )}
+          <button
+            onClick={() => setActiveTab('system_design')}
+            className={`tab ${activeTab === 'system_design' ? 'tab-active' : ''}`}
+          >
+            <span className="flex items-center gap-2">
+              System Design
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`tab ${activeTab === 'history' ? 'tab-active' : ''}`}
+          >
+            <span className="flex items-center gap-2">
+              Past Submissions
+              {evaluations.length > 0 && (
+                <span className="badge badge-neutral">
+                  {evaluations.length}
+                </span>
+              )}
+            </span>
+          </button>
         </div>
 
         {/* Tab description */}
         <p className="text-[var(--text-muted)] text-sm mb-6">
           {activeTab === 'system_design' && 'Resources to prepare for system design interviews. Practice designing scalable systems.'}
-          {activeTab === 'neetcode' && 'The NeetCode 150 - a curated list of the most important LeetCode problems.'}
+          {activeTab === 'neetcode' && userIsAdmin && 'The NeetCode 150 - a curated list of the most important LeetCode problems.'}
           {activeTab === 'history' && 'Your past interview submissions and evaluations.'}
         </p>
 
@@ -431,7 +457,8 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        ) : activeTab === 'neetcode' ? (
+        ) : activeTab === 'neetcode' && userIsAdmin ? (
+          // NeetCode 150 Roadmap (admin only)
           <div>
             {isLoadingRoadmap ? (
               <div className="text-center py-12">

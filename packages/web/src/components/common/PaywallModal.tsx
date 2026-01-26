@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { analytics } from '../../lib/posthog'
+import { useAuth } from '../../contexts/AuthContext'
+import { isAdmin } from '../../lib/admin'
 
 interface PaywallModalProps {
   isOpen: boolean
@@ -18,6 +20,8 @@ export default function PaywallModal({
   existingInterview,
 }: PaywallModalProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const userIsAdmin = isAdmin(user)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
@@ -97,7 +101,7 @@ export default function PaywallModal({
             {[
               'Unlimited AI mock interviews',
               'Detailed AI feedback on every interview',
-              'Full access to NeetCode 150 + System Design',
+              userIsAdmin ? 'Full access to NeetCode 150 + System Design' : 'Full access to System Design',
               'Progress tracking and weakness analysis',
             ].map((benefit, i) => (
               <li key={i} className="flex items-center gap-2.5 text-sm text-[var(--text-secondary)]">

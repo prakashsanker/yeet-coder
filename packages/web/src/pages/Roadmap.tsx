@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
 import { api, type Topic, type Question, type Evaluation, type InterviewSession } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { isAdmin } from '../lib/admin'
 
 interface TopicWithProgress extends Topic {
   questions: Question[]
@@ -35,11 +36,21 @@ const SYSTEM_DESIGN_ROADMAP = [
 export default function Roadmap() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const userIsAdmin = isAdmin(user)
   const [topics, setTopics] = useState<TopicWithProgress[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeType, setActiveType] = useState<'coding' | 'system_design'>('coding')
+  // Non-admin users default to system_design (coding tab is hidden for them)
+  const [activeType, setActiveType] = useState<'coding' | 'system_design'>(userIsAdmin ? 'coding' : 'system_design')
   const [selectedTopic, setSelectedTopic] = useState<TopicWithProgress | null>(null)
   const [evaluations, setEvaluations] = useState<EvaluationWithInterview[]>([])
+
+  // Ensure non-admin users can't access coding tab
+  // This handles race conditions where user loads after initial render
+  useEffect(() => {
+    if (user && !userIsAdmin && activeType === 'coding') {
+      setActiveType('system_design')
+    }
+  }, [user, userIsAdmin, activeType])
 
   // Load topics and questions
   useEffect(() => {
@@ -181,28 +192,33 @@ export default function Roadmap() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">
-            Interview Roadmap
+            {userIsAdmin ? 'Interview Roadmap' : 'System Design Roadmap'}
           </h1>
           <p className="text-[var(--text-secondary)]">
-            Follow this structured path to master coding and system design interviews
+            {userIsAdmin
+              ? 'Follow this structured path to master coding and system design interviews'
+              : 'Follow this structured path to master system design interviews'
+            }
           </p>
         </div>
 
         {/* Type Tabs */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <button
-            onClick={() => {
-              setActiveType('coding')
-              setSelectedTopic(null)
-            }}
-            className={`px-6 py-2 rounded-xl font-medium transition-colors ${
-              activeType === 'coding'
-                ? 'btn-primary'
-                : 'btn-secondary'
-            }`}
-          >
-            Coding (NeetCode 150)
-          </button>
+          {userIsAdmin && (
+            <button
+              onClick={() => {
+                setActiveType('coding')
+                setSelectedTopic(null)
+              }}
+              className={`px-6 py-2 rounded-xl font-medium transition-colors ${
+                activeType === 'coding'
+                  ? 'btn-primary'
+                  : 'btn-secondary'
+              }`}
+            >
+              Coding (NeetCode 150)
+            </button>
+          )}
           <button
             onClick={() => {
               setActiveType('system_design')

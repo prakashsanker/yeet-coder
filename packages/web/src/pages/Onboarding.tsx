@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { api, ApiError, type Topic, type Question } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { isAdmin } from '../lib/admin'
 import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
 import { analytics } from '../lib/posthog'
@@ -39,12 +40,24 @@ export default function Onboarding() {
     session_type: 'coding' | 'system_design'
   } | null>(null)
 
+  const userIsAdmin = isAdmin(user)
+
+  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/')
     }
   }, [user, authLoading, navigate])
 
+  // Auto-select system_design for non-admin users
+  useEffect(() => {
+    if (!authLoading && user && !userIsAdmin && !preSelectedQuestion && !interviewType) {
+      setInterviewType('system_design')
+      analytics.interviewTypeSelected('system_design')
+    }
+  }, [authLoading, user, userIsAdmin, preSelectedQuestion, interviewType])
+
+  // Load topics when LeetCode is selected
   useEffect(() => {
     if (interviewType === 'leetcode') {
       setLoading(true)
@@ -82,7 +95,9 @@ export default function Onboarding() {
   }, [selectedTopic])
 
   const getCurrentStep = (): Step => {
-    if (!interviewType) return 'type'
+    // Non-admin users skip the type selection (system_design is auto-selected)
+    if (!interviewType) return userIsAdmin ? 'type' : 'question'
+    // Skip topic selection if question is already pre-selected
     if (interviewType === 'leetcode' && !selectedTopic && !selectedQuestion) return 'topic'
     if (!selectedQuestion) return 'question'
     return 'confirm'
@@ -101,6 +116,12 @@ export default function Onboarding() {
         setSelectedTopic(null)
         setQuestions([])
       } else {
+        // Non-admin users go back to dashboard from question selection
+        // since they skip the type selection step
+        if (!userIsAdmin) {
+          navigate('/dashboard')
+          return
+        }
         setInterviewType(null)
         setQuestions([])
       }
@@ -180,16 +201,20 @@ export default function Onboarding() {
       <AppHeader showBack onBack={handleBack}>
         {/* Progress indicator */}
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full transition-colors ${step === 'type' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
-          <div className={`w-2 h-2 rounded-full transition-colors ${step === 'topic' || (interviewType === 'system_design' && step === 'question') ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
-          <div className={`w-2 h-2 rounded-full transition-colors ${step === 'question' || step === 'confirm' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
+          {userIsAdmin && (
+            <>
+              <div className={`w-2 h-2 rounded-full transition-colors ${step === 'type' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
+              <div className={`w-2 h-2 rounded-full transition-colors ${step === 'topic' || (interviewType === 'system_design' && step === 'question') ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
+            </>
+          )}
+          <div className={`w-2 h-2 rounded-full transition-colors ${step === 'question' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
           <div className={`w-2 h-2 rounded-full transition-colors ${step === 'confirm' ? 'bg-[var(--text-primary)]' : 'bg-[rgba(0,0,0,0.15)]'}`} />
         </div>
       </AppHeader>
 
       <main className="max-w-4xl mx-auto px-6 py-12">
-        {/* Step: Choose Interview Type */}
-        {step === 'type' && (
+        {/* Step: Choose Interview Type (admin only) */}
+        {step === 'type' && userIsAdmin && (
           <div className="space-y-8">
             <div className="text-center">
               <h1 className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight mb-3">What do you want to practice?</h1>
