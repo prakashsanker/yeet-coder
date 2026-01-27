@@ -8,6 +8,7 @@ import Onboarding from './pages/Onboarding'
 import Interview from './pages/Interview'
 import SystemDesignInterview from './pages/SystemDesignInterview'
 import Evaluation from './pages/Evaluation'
+import GeneratingEvaluation from './pages/GeneratingEvaluation'
 import Subscription from './pages/Subscription'
 import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
@@ -77,6 +78,7 @@ function App() {
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/interview/:id" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
       <Route path="/system-design/:id" element={<ProtectedRoute><SystemDesignInterview /></ProtectedRoute>} />
+      <Route path="/evaluation/generating/:interviewId" element={<ProtectedRoute><GeneratingEvaluation /></ProtectedRoute>} />
       <Route path="/evaluation/:id" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
       <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
     </Routes>

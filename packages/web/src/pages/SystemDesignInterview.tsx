@@ -40,6 +40,9 @@ export default function SystemDesignInterview() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGivingUp, setIsGivingUp] = useState(false)
 
+  // Question panel state
+  const [isQuestionExpanded, setIsQuestionExpanded] = useState(false)
+
   // Refs
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null)
@@ -52,15 +55,13 @@ export default function SystemDesignInterview() {
     return `${q.title}\n\n${q.description}`
   }, [interview])
 
-  // Voice interaction hook - using Realtime API for low-latency
+  // Voice interaction hook - using Realtime API for low-latency conversation
   const {
     voiceState,
     currentTranscript,
-    isConnected: isWsConnected,
-    isGeneratingIntro,
     startListening,
     stopListening,
-    playRealtimeIntroduction,
+    playCachedIntroduction,
     isAlwaysListening,
     isSpeechDetected,
     enableAlwaysListening,
@@ -182,27 +183,26 @@ export default function SystemDesignInterview() {
     }
   }, [interviewIdParam, interview, elements, notes, timeSpentMs])
 
-  // Generate and play introduction using Realtime API voice (same as conversation)
-  // This is triggered when WebSocket connects and question is loaded
+  // Generate introduction with pre-generated TTS audio (faster than Realtime API)
+  // This starts as soon as question data is loaded - no WebSocket dependency
   useEffect(() => {
     // Skip if intro was already played or this is a resumed session
     if (hasIntroduced || isResumedSession) {
       return
     }
 
-    // Need WebSocket connection and question data
-    if (!isWsConnected || !interview?.question || !questionContext) {
+    // Need question data
+    if (!interview?.question || !questionContext) {
       return
     }
 
     // Already generating or have cached intro
-    if (isPreloading || isGeneratingIntro || cachedIntro) {
+    if (isPreloading || cachedIntro) {
       return
     }
 
-    // First, generate the introduction text via REST API (fast, text-only)
-    // Then generate audio via Realtime API WebSocket for voice consistency
-    console.log('[INTRO] Generating system design introduction text...')
+    // Generate introduction text AND audio via REST API (using OpenAI TTS - faster than Realtime API)
+    console.log('[INTRO] Generating system design introduction with audio...')
     setIsPreloading(true)
 
     fetch(`${API_URL}/api/voice/introduce`, {
@@ -210,7 +210,7 @@ export default function SystemDesignInterview() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         current_question: questionContext,
-        include_audio: false, // Don't use TTS - we'll use Realtime API for audio
+        include_audio: true, // Use OpenAI TTS for pre-generated audio (faster than Realtime API)
       }),
     })
       .then((res) => {
@@ -221,37 +221,37 @@ export default function SystemDesignInterview() {
       })
       .then((data) => {
         if (data.success && data.text) {
-          console.log('[INTRO] Got introduction text, generating audio via Realtime API...')
-          // Store the text, audio will be generated via Realtime API
-          setCachedIntro({ text: data.text })
+          console.log('[INTRO] Got introduction with audio, ready to play immediately')
+          // Store both text and pre-generated audio
+          setCachedIntro({ text: data.text, audio: data.audio })
         } else {
           console.error('[INTRO] API returned unsuccessful response:', data)
         }
       })
       .catch((err) => {
-        console.error('[INTRO] Failed to generate introduction text:', err)
+        console.error('[INTRO] Failed to generate introduction:', err)
       })
       .finally(() => {
         setIsPreloading(false)
       })
-  }, [interview, questionContext, isWsConnected, cachedIntro, isPreloading, isGeneratingIntro, hasIntroduced, isResumedSession])
+  }, [interview, questionContext, cachedIntro, isPreloading, hasIntroduced, isResumedSession])
 
-  // Play intro when text is ready - use Realtime API for audio
+  // Play intro when audio is ready - use pre-generated TTS audio (faster)
   useEffect(() => {
-    if (cachedIntro && !hasIntroduced && interview?.question && !isResumedSession && isWsConnected) {
+    if (cachedIntro && !hasIntroduced && interview?.question && !isResumedSession) {
       setHasIntroduced(true)
       // Persist to localStorage so refresh doesn't replay intro
       if (interviewIdParam) {
         localStorage.setItem(`intro_played_${interviewIdParam}`, 'true')
       }
 
-      // Use Realtime API to generate and play audio (same voice as conversation)
+      // Play pre-generated audio immediately (no WebSocket dependency for intro playback)
       setTimeout(() => {
-        console.log('[INTRO] Playing introduction with Realtime API voice...')
-        playRealtimeIntroduction(cachedIntro.text)
-      }, 500)
+        console.log('[INTRO] Playing pre-generated introduction audio...')
+        playCachedIntroduction(cachedIntro)
+      }, 300)
     }
-  }, [cachedIntro, hasIntroduced, interview, playRealtimeIntroduction, interviewIdParam, isResumedSession, isWsConnected])
+  }, [cachedIntro, hasIntroduced, interview, playCachedIntroduction, interviewIdParam, isResumedSession])
 
   // Handle drawing changes
   const handleExcalidrawChange = useCallback((newElements: readonly unknown[]) => {
@@ -283,11 +283,8 @@ export default function SystemDesignInterview() {
         time_spent_seconds: Math.floor(timeSpentMs / 1000),
       })
 
-      // Create evaluation
-      const { evaluation } = await api.evaluations.create({ interview_id: interviewIdParam })
-
-      // Navigate to evaluation page
-      navigate(`/evaluation/${evaluation.id}`)
+      // Navigate immediately to generating page - it will create the evaluation
+      navigate(`/evaluation/generating/${interviewIdParam}`)
     } catch (err) {
       console.error('Error submitting interview:', err)
       alert('Failed to submit interview. Please try again.')
@@ -361,14 +358,13 @@ export default function SystemDesignInterview() {
   }
 
   // Waiting for intro to generate (skip for resumed sessions)
-  if (!cachedIntro && (isPreloading || isGeneratingIntro || !isWsConnected) && !isResumedSession && !hasIntroduced) {
+  // Note: We don't need WebSocket connected for intro - it uses pre-generated TTS audio
+  if (!cachedIntro && isPreloading && !isResumedSession && !hasIntroduced) {
     return (
       <div className="h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
           <div className="spinner w-12 h-12 mx-auto mb-4"></div>
-          <p className="text-[var(--text-muted)]">
-            {!isWsConnected ? 'Connecting to voice service...' : isGeneratingIntro ? 'Generating introduction...' : 'Preparing AI interviewer...'}
-          </p>
+          <p className="text-[var(--text-muted)]">Preparing AI interviewer...</p>
         </div>
       </div>
     )
@@ -380,21 +376,6 @@ export default function SystemDesignInterview() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-page)] overflow-hidden">
-      {/* Loading overlay for submit/give up */}
-      {(isSubmitting || isGivingUp) && (
-        <div className="absolute inset-0 z-50 bg-[var(--bg-page)]/95 flex items-center justify-center">
-          <div className="text-center">
-            <div className="spinner w-12 h-12 mx-auto mb-4"></div>
-            <p className="text-lg font-medium text-[var(--text-primary)]">
-              {isSubmitting ? 'Generating evaluation...' : 'Saving your progress...'}
-            </p>
-            <p className="text-sm text-[var(--text-muted)] mt-2">
-              {isSubmitting ? 'This may take a moment' : 'Please wait'}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <AppHeader
         rightContent={
@@ -432,17 +413,42 @@ export default function SystemDesignInterview() {
         </div>
       </AppHeader>
 
-      {/* Main content */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left panel: Question */}
-        <div className="w-80 p-4 border-r border-[rgba(0,0,0,0.08)] overflow-y-auto flex-shrink-0 bg-white">
-          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{question?.title}</h2>
-          <div className="prose prose-sm max-w-none">
-            <div className="whitespace-pre-wrap text-[var(--text-secondary)]">{question?.description}</div>
+      {/* Collapsible Question Panel - at the top */}
+      <div className="border-b border-[rgba(0,0,0,0.08)] bg-white">
+        <button
+          onClick={() => setIsQuestionExpanded(!isQuestionExpanded)}
+          className="w-full px-4 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <svg
+              className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${isQuestionExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            <span className="text-sm font-medium text-[var(--text-primary)]">
+              {isQuestionExpanded ? 'Hide Problem' : 'Show Problem'}
+            </span>
           </div>
-        </div>
+          <span className="text-xs text-[var(--text-muted)]">
+            Click to {isQuestionExpanded ? 'collapse' : 'expand'} problem description
+          </span>
+        </button>
+        {isQuestionExpanded && (
+          <div className="px-4 pb-4 max-h-64 overflow-y-auto">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-2">{question?.title}</h2>
+            <div className="prose prose-sm max-w-none">
+              <div className="whitespace-pre-wrap text-[var(--text-secondary)] text-sm">{question?.description}</div>
+            </div>
+          </div>
+        )}
+      </div>
 
-        {/* Center panel: Excalidraw */}
+      {/* Main content - full width for Excalidraw with narrower notes panel */}
+      <div className="flex-1 flex min-h-0">
+        {/* Main panel: Excalidraw */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 bg-white min-h-0">
             <Excalidraw
@@ -453,17 +459,17 @@ export default function SystemDesignInterview() {
           </div>
         </div>
 
-        {/* Right panel: Notes */}
-        <div className="w-80 flex flex-col border-l border-[rgba(0,0,0,0.08)] flex-shrink-0 bg-white">
+        {/* Right panel: Notes (narrower) */}
+        <div className="w-72 flex flex-col border-l border-[rgba(0,0,0,0.08)] flex-shrink-0 bg-white">
           <div className="p-3 border-b border-[rgba(0,0,0,0.08)]">
             <h3 className="font-semibold text-sm text-[var(--text-primary)]">Notes</h3>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Write down your thoughts, calculations, and decisions</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Thoughts, calculations, decisions</p>
           </div>
           <textarea
             value={notes}
             onChange={handleNotesChange}
-            placeholder="- Requirements clarification&#10;- Capacity estimates&#10;- API endpoints&#10;- Data model&#10;- Trade-offs..."
-            className="flex-1 p-4 bg-[var(--bg-section)] text-[var(--text-primary)] text-sm resize-none focus:outline-none font-mono border-0"
+            placeholder="- Requirements&#10;- Capacity estimates&#10;- API endpoints&#10;- Data model&#10;- Trade-offs..."
+            className="flex-1 p-3 bg-[var(--bg-section)] text-[var(--text-primary)] text-sm resize-none focus:outline-none font-mono border-0"
           />
         </div>
       </div>

@@ -1,38 +1,58 @@
 /**
  * AI-powered evaluation service for system design interviews.
- * Evaluates:
- * 1. Requirements gathering - Did they clarify requirements?
- * 2. System components - Correct high-level architecture?
- * 3. Scalability - Addressed scaling concerns?
- * 4. Data model - Good schema design?
- * 5. API design - Clean API contracts?
- * 6. Trade-offs - Discussed trade-offs?
- * 7. Communication - Clear explanation?
+ *
+ * Evaluation focuses on two dimensions:
+ *
+ * 1. STYLE - How they approached the problem:
+ *    - Clarity of thought
+ *    - Structure and organization
+ *    - Diagram quality
+ *    - Trade-off consideration
+ *
+ * 2. COMPLETENESS - What they covered vs the answer key:
+ *    - Did they hit the key features?
+ *    - Are there major gaps?
+ *    - Was each feature explored with enough detail?
+ *
+ * Feedback is long-form with specific examples and actionable recommendations.
  */
 
 import { llm, type LLMModel } from './llm.js'
-import type { TranscriptEntry, ExcalidrawData, ExcalidrawElement, SystemDesignFeedback } from '../types/index.js'
+import {
+  SYSTEM_DESIGN_PERSONA,
+  buildEvaluationInstructions,
+} from './interviewerPersona.js'
+import type {
+  TranscriptEntry,
+  ExcalidrawData,
+  ExcalidrawElement,
+  SystemDesignFeedback,
+  SystemDesignReferenceSolutions,
+} from '../types/index.js'
 
 export interface SystemDesignEvaluationInput {
-  // Interview data
   interviewId: string
   questionTitle: string
   questionDescription: string
   questionDifficulty: 'easy' | 'medium' | 'hard'
   keyConsiderations?: string[]
-
-  // User's work
+  referenceSolutions?: SystemDesignReferenceSolutions
   drawingData: ExcalidrawData | null
   notes: string | null
   transcript: TranscriptEntry[]
-
-  // Time metrics
   timeSpentSeconds: number
   timeLimitSeconds: number
 }
 
 export interface SystemDesignEvaluationResult {
-  // Individual scores (0-100)
+  // Style and Completeness ratings
+  style_rating: 'strong' | 'adequate' | 'needs_improvement'
+  completeness_rating: 'comprehensive' | 'adequate' | 'incomplete'
+
+  // Legacy numeric scores for backward compatibility
+  clarity_score: number
+  structure_score: number
+  correctness_score: number
   requirements_gathering_score: number
   system_components_score: number
   scalability_score: number
@@ -40,289 +60,280 @@ export interface SystemDesignEvaluationResult {
   api_design_score: number
   trade_offs_score: number
   communication_score: number
-
-  // Overall
   overall_score: number
 
-  // Detailed feedback
   feedback: SystemDesignFeedback
 }
 
 // ============================================
-// DIAGRAM SUMMARIZATION HELPERS
+// DIAGRAM HELPERS
 // ============================================
 
-/**
- * Find text elements that are likely labels for a shape
- * (text that overlaps or is very close to the shape)
- */
 function findLabelForShape(elements: ExcalidrawElement[], shape: ExcalidrawElement): string | null {
   const textElements = elements.filter(el => el.type === 'text')
-
   for (const text of textElements) {
     const textContent = (text.text || text.originalText || '') as string
     if (!textContent) continue
-
-    // Check if text is inside or very close to the shape
-    const shapeLeft = shape.x
-    const shapeRight = shape.x + (shape.width || 0)
-    const shapeTop = shape.y
-    const shapeBottom = shape.y + (shape.height || 0)
-
-    const textX = text.x
-    const textY = text.y
-
-    // Text is inside shape bounds (with some margin)
     const margin = 50
-    if (textX >= shapeLeft - margin && textX <= shapeRight + margin &&
-        textY >= shapeTop - margin && textY <= shapeBottom + margin) {
+    if (text.x >= shape.x - margin && text.x <= shape.x + (shape.width || 0) + margin &&
+        text.y >= shape.y - margin && text.y <= shape.y + (shape.height || 0) + margin) {
       return textContent
     }
   }
-
   return null
 }
 
-/**
- * Find what component an arrow is connected to
- */
-function findConnectedComponent(
-  elements: ExcalidrawElement[],
-  arrow: ExcalidrawElement,
-  end: 'start' | 'end'
-): string | null {
-  const binding = end === 'start' ? arrow.startBinding : arrow.endBinding
-  if (!binding?.elementId) return null
-
-  const connectedElement = elements.find(el => el.id === binding.elementId)
-  if (!connectedElement) return null
-
-  return findLabelForShape(elements, connectedElement)
-}
-
-/**
- * Summarize the diagram for the AI to understand
- */
 function summarizeDiagram(elements: ExcalidrawElement[] | undefined): string {
   if (!elements || elements.length === 0) {
     return 'No diagram provided'
   }
 
   const components: string[] = []
-  const connections: string[] = []
   const allLabels: string[] = []
 
-  // Collect all text labels first
   for (const el of elements) {
     if (el.type === 'text') {
       const text = (el.text || el.originalText || '') as string
-      if (text.trim()) {
-        allLabels.push(text.trim())
-      }
+      if (text.trim()) allLabels.push(text.trim())
     }
   }
 
-  // Find components (shapes with labels)
   for (const el of elements) {
     if (el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'diamond') {
       const label = findLabelForShape(elements, el)
-      if (label) {
-        components.push(label)
-      }
-    }
-  }
-
-  // Find connections
-  for (const el of elements) {
-    if (el.type === 'arrow' || el.type === 'line') {
-      const fromLabel = findConnectedComponent(elements, el, 'start')
-      const toLabel = findConnectedComponent(elements, el, 'end')
-      if (fromLabel && toLabel) {
-        connections.push(`${fromLabel} → ${toLabel}`)
-      }
+      if (label) components.push(label)
     }
   }
 
   let summary = ''
-
   if (components.length > 0) {
-    summary += `**Components identified:** ${components.join(', ')}\n\n`
+    summary += `Components: ${components.join(', ')}\n`
   } else if (allLabels.length > 0) {
-    // Fallback: just list all text labels
-    summary += `**Labels found:** ${allLabels.join(', ')}\n\n`
-  }
-
-  if (connections.length > 0) {
-    summary += `**Connections:** ${connections.join('; ')}\n\n`
+    summary += `Labels: ${allLabels.join(', ')}\n`
   }
 
   const rectCount = elements.filter(e => e.type === 'rectangle').length
   const arrowCount = elements.filter(e => e.type === 'arrow').length
-  const textCount = elements.filter(e => e.type === 'text').length
-
-  summary += `**Total elements:** ${elements.length} (${rectCount} rectangles, ${arrowCount} arrows, ${textCount} text labels)`
+  summary += `(${rectCount} boxes, ${arrowCount} arrows, ${elements.length} total elements)`
 
   return summary
 }
 
-/**
- * Format timestamp for display
- */
 function formatTimestamp(timestamp: number): string {
-  try {
-    const totalSeconds = Math.floor(timestamp / 1000)
-    const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
-    const seconds = (totalSeconds % 60).toString().padStart(2, '0')
-    return `${minutes}:${seconds}`
-  } catch {
-    return String(timestamp)
-  }
+  const totalSeconds = Math.floor(timestamp / 1000)
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0')
+  return `${minutes}:${seconds}`
 }
 
 function formatTranscript(transcript: TranscriptEntry[]): string {
   if (!transcript || transcript.length === 0) {
-    return '(No transcript available - user did not speak during the interview)'
+    return '(No transcript - candidate did not speak)'
   }
-
   return transcript
     .map((entry) => `[${formatTimestamp(entry.timestamp)}] ${entry.speaker.toUpperCase()}: ${entry.text}`)
     .join('\n\n')
 }
 
-// ============================================
-// SYSTEM PROMPT
-// ============================================
-
-const SYSTEM_DESIGN_EVALUATION_PROMPT = `You are an expert system design coach helping candidates improve their interview skills.
-You are evaluating a practice system design interview to provide constructive feedback.
-
-Your evaluation must be:
-1. THOROUGH - Consider all aspects of system design
-2. FAIR - Give credit for good ideas even if presentation was imperfect
-3. CONSTRUCTIVE - Focus on helping them improve, not judging them
-4. ENCOURAGING - Highlight what they did well while being honest about areas to improve
-5. ACTIONABLE - Provide specific, concrete feedback they can act on
-
-You will receive:
-1. The system design question (title, description, key considerations)
-2. The candidate's diagram (as JSON elements - rectangles are components, arrows are connections, text labels)
-3. A summary of the diagram components and connections
-4. The candidate's written notes
-5. The transcript of the verbal discussion with the interviewer
-6. Time spent and time limit
-
-IMPORTANT GUIDELINES FOR INTERPRETING THE DIAGRAM:
-- Rectangles/boxes typically represent system components (services, databases, caches)
-- Arrows represent data flow or connections between components
-- Text elements are labels or annotations
-- Look for component names, not just shapes
-- A simple diagram with correct components is better than a complex incorrect one
-
-IMPORTANT GUIDELINES FOR INTERPRETING THE TRANSCRIPT:
-- The transcript shows the conversation between candidate and AI interviewer
-- Look for: clarifying questions, explanations, responses to probing questions
-- Consider both what they said AND what they drew/wrote
-- Give credit for verbal explanations even if not in the diagram
-
-EVALUATION CRITERIA (score each 0-100):
-
-1. REQUIREMENTS GATHERING (10% weight)
-   - Did they clarify functional requirements?
-   - Did they identify non-functional requirements (scale, latency, availability)?
-   - Did they establish scope and make explicit assumptions?
-   Scoring: 90-100 = comprehensive, asked insightful questions | 70-89 = good coverage | 50-69 = basic | 30-49 = minimal | 0-29 = none
-
-2. SYSTEM COMPONENTS (20% weight)
-   - Are the right components present for this problem?
-   - Is the architecture coherent and appropriate?
-   - Are responsibilities clearly defined?
-   - Look for: Load balancers, app servers, databases, caches, queues, CDN, etc.
-   Scoring: 90-100 = all critical components, well-organized | 70-89 = most present | 50-69 = some missing | 30-49 = major gaps | 0-29 = incomplete
-
-3. SCALABILITY (20% weight)
-   - Did they address horizontal scaling?
-   - Did they discuss caching, load balancing, database scaling?
-   - Did they estimate capacity requirements?
-   - Look for: sharding, replication, read replicas, async processing
-   Scoring: 90-100 = comprehensive with estimates | 70-89 = several strategies | 50-69 = basic "add servers" | 30-49 = minimal | 0-29 = none
-
-4. DATA MODEL (15% weight)
-   - Did they design appropriate schemas?
-   - Did they justify database choices (SQL vs NoSQL)?
-   - Did they consider indexing, partitioning?
-   Scoring: 90-100 = well-designed, justified | 70-89 = good model | 50-69 = basic schema | 30-49 = minimal | 0-29 = none
-
-5. API DESIGN (10% weight)
-   - Did they define clear API contracts?
-   - Did they consider authentication, rate limiting?
-   Scoring: 90-100 = well-defined, security considered | 70-89 = clear structure | 50-69 = basic endpoints | 30-49 = minimal | 0-29 = none
-
-6. TRADE-OFFS (15% weight)
-   - Did they discuss trade-offs (consistency vs availability, cost vs performance)?
-   - Did they justify their decisions?
-   - Did they acknowledge limitations?
-   Scoring: 90-100 = multiple trade-offs, well-justified | 70-89 = several mentioned | 50-69 = some acknowledged | 30-49 = minimal | 0-29 = none
-
-7. COMMUNICATION (10% weight)
-   - Was the explanation clear and structured?
-   - Did they use the diagram effectively?
-   - Did they respond well to questions?
-   Scoring: 90-100 = excellent, logical flow | 70-89 = clear | 50-69 = adequate | 30-49 = unclear | 0-29 = poor
-
-OVERALL SCORE CALCULATION:
-overall = requirements*0.10 + components*0.20 + scalability*0.20 + data_model*0.15 + api*0.10 + tradeoffs*0.15 + communication*0.10
-
-FEEDBACK PHILOSOPHY:
-- Focus on LEARNING, not judgment
-- Be encouraging while being honest
-- Provide SPECIFIC, ACTIONABLE feedback
-- Highlight what was done well to reinforce good habits
-- Frame improvements as opportunities, not failures
-
-OUTPUT FORMAT:
-You must respond with valid JSON only, no other text. Use this exact structure:
-
-{
-  "requirements_gathering_score": <0-100>,
-  "system_components_score": <0-100>,
-  "scalability_score": <0-100>,
-  "data_model_score": <0-100>,
-  "api_design_score": <0-100>,
-  "trade_offs_score": <0-100>,
-  "communication_score": <0-100>,
-  "overall_score": <0-100>,
-  "feedback": {
-    "summary": "<1-2 sentence overall assessment, balanced and constructive>",
-    "good_points": [
-      "<specific thing done well 1>",
-      "<specific thing done well 2>",
-      "<specific thing done well 3>"
-    ],
-    "areas_for_improvement": [
-      "<specific, actionable improvement 1>",
-      "<specific, actionable improvement 2>",
-      "<specific, actionable improvement 3>"
-    ],
-    "detailed_notes": {
-      "requirements": "<feedback on requirements gathering>",
-      "architecture": "<feedback on system components>",
-      "scalability": "<feedback on scalability>",
-      "data_model": "<feedback on data model>",
-      "api_design": "<feedback on API design>",
-      "trade_offs": "<feedback on trade-offs>",
-      "communication": "<feedback on communication>"
-    },
-    "missed_components": ["<component they should have included>"],
-    "study_recommendations": ["<specific topic/resource to study>"],
-    "key_takeaway": "<single most important thing to focus on for next time>"
+function formatReferenceSolutions(solutions?: SystemDesignReferenceSolutions): string {
+  // If we have a synthesized answer key, prefer that (it's curated and well-structured)
+  if (solutions?.synthesized_answer_key) {
+    return solutions.synthesized_answer_key
   }
+
+  // Fallback to raw scraped solutions
+  if (!solutions?.solutions || solutions.solutions.length === 0) {
+    return '(No reference solution available)'
+  }
+  return solutions.solutions
+    .map(s => `### Source: ${s.source_label}\n\n${s.solution_text}`)
+    .join('\n\n---\n\n')
 }
 
-CRITICAL JSON FORMATTING:
-- Return ONLY valid JSON
-- Use double quotes for strings
-- Escape special characters
-- No trailing commas`
+// ============================================
+// EVALUATION PROMPT
+// ============================================
+
+// Build the evaluation prompt by combining the persona's grading philosophy
+// with the specific output format requirements
+function buildSystemDesignEvaluationPrompt(referenceSolutionText?: string): string {
+  // Start with the persona's evaluation instructions (the "who" and "how")
+  const personaInstructions = buildEvaluationInstructions(
+    SYSTEM_DESIGN_PERSONA,
+    referenceSolutionText
+  )
+
+  // Add the specific output format requirements
+  const outputFormat = `
+
+## CRITICAL CHECKLIST - EVALUATE THESE FIRST
+
+Before rating, check if the candidate covered these MANDATORY topics:
+
+### 0. REQUIREMENTS GATHERING (MUST DO FIRST - Skipping = "needs_improvement")
+
+**Functional Requirements** - What the system should DO:
+- [ ] Did they ask clarifying questions about features?
+- [ ] Did they identify core features vs nice-to-haves?
+- [ ] Did they define the scope (what's in, what's out)?
+Examples: "Should users be able to edit pastes?" "Do we need user accounts?" "Should links expire?"
+
+**Non-Functional Requirements** - HOW the system should perform:
+- [ ] Did they ask about scale? (users, requests, data volume)
+- [ ] Did they discuss latency requirements? (read latency, write latency)
+- [ ] Did they mention availability/durability requirements? (99.9%? 99.99%?)
+- [ ] Did they consider consistency vs availability trade-offs?
+Examples: "How many users?" "What's acceptable latency?" "How important is data durability?"
+
+**CRITICAL**: If they jumped straight into design without clarifying requirements → "needs_improvement" for style. No exceptions. A senior engineer ALWAYS clarifies requirements first.
+
+Rate requirements gathering:
+- "thorough": Asked about both functional AND non-functional, defined scope clearly
+- "partial": Asked some questions but missed key areas (e.g., no scale discussion)
+- "skipped": Jumped straight into design without clarifying
+
+### 1. CAPACITY ESTIMATES (Required for "strong"/"comprehensive")
+Search the transcript for ANY numbers related to:
+- [ ] QPS/Traffic estimates (reads per second, writes per second)
+- [ ] Storage estimates (GB/TB, growth rate)
+- [ ] Bandwidth estimates (MB/s ingress/egress)
+- [ ] Memory/Cache sizing
+
+If they have ZERO numbers → Cannot be "comprehensive". If they only have numbers because interviewer prompted → "adequate" at best.
+
+### 2. ID/KEY GENERATION (Required for URL shorteners, pastebins, etc.)
+- [ ] Did they explain HOW unique IDs are generated?
+- [ ] Did they address collision handling?
+- [ ] Did they discuss trade-offs (sequential vs random, length, encoding)?
+
+If they just said "use UUID" or "S3 handles it" without explaining → This is a gap. Probe depth.
+
+### 3. DATABASE CHOICE JUSTIFICATION
+- [ ] Did they choose a specific database?
+- [ ] Did they explain WHY (not just name-drop)?
+- [ ] Did they discuss alternatives and trade-offs?
+
+### 4. SCALING STRATEGY
+- [ ] Specific scaling mechanisms (not just "add servers")
+- [ ] Sharding strategy if applicable
+- [ ] Caching strategy with invalidation
+
+### 5. FAILURE HANDLING
+- [ ] What happens when components fail?
+- [ ] Replication strategy
+- [ ] Data durability approach
+
+## FEEDBACK GUIDELINES
+
+Your feedback must be:
+1. **HARSH** - If they missed something, call it out clearly. Don't soften.
+2. **SPECIFIC** - Quote their transcript: "You said X, but you should have said Y"
+3. **COMPARATIVE** - Compare explicitly to the answer key: "The answer key covers X, but you missed it"
+4. **QUANTITATIVE** - Count what % of the answer key they covered
+
+For each gap, be explicit:
+- "You never mentioned capacity estimates. A strong candidate would have said: 'If we have 1M users doing 10 pastes/day, that's 115 writes/sec...'"
+- "You said 'just use S3' for storage but didn't explain how IDs are generated or how you'd handle the key space."
+
+## CRITICAL: DETAILED GAP ANALYSIS
+
+The "gaps" array is the MOST IMPORTANT part of your evaluation. For EVERY major topic in the answer key that the candidate missed or covered poorly:
+
+1. **Quote what they said** - Copy their exact words from the transcript. If they never mentioned it, write "Not mentioned".
+
+2. **Copy from the answer key** - In "answer_key_excerpt", DIRECTLY COPY the relevant section from the reference solution. Don't paraphrase - use the actual text so the candidate can see exactly what they missed.
+
+3. **Give a speakable example** - In "example_good_response", write what a strong candidate would actually SAY in the interview. Make it conversational, like: "So for ID generation, I'd use a combination of timestamp and random bits - specifically a 41-bit timestamp gives us 69 years of IDs, plus a 10-bit machine ID and 12-bit sequence number. This gives us 4096 IDs per millisecond per machine with no coordination needed."
+
+The goal is to show the candidate EXACTLY what they should have said, not just tell them they missed something.
+
+## OUTPUT FORMAT
+
+Return valid JSON:
+
+{
+  "style": {
+    "rating": "strong" | "adequate" | "needs_improvement",
+    "assessment": "<2-3 paragraph assessment - be harsh if they needed prompting or skipped structure>",
+    "requirements_gathering": "thorough" | "partial" | "skipped",
+    "functional_requirements_covered": true | false,
+    "non_functional_requirements_covered": true | false,
+    "did_capacity_estimates": true | false,
+    "capacity_estimates_prompted": true | false,
+    "strengths": [
+      {
+        "point": "<what they did well>",
+        "example": "<quote from their transcript>"
+      }
+    ],
+    "improvements": [
+      {
+        "point": "<what to improve>",
+        "what_they_did": "<exact quote or 'They never mentioned X'>",
+        "what_would_be_better": "<specific example from answer key>"
+      }
+    ]
+  },
+
+  "completeness": {
+    "rating": "comprehensive" | "adequate" | "incomplete",
+    "assessment": "<2-3 paragraph assessment - list specific topics from answer key they missed>",
+    "answer_key_coverage_percent": <number 0-100>,
+    "covered_well": [
+      {
+        "topic": "<feature/topic from answer key>",
+        "detail": "<how well they covered it vs answer key>"
+      }
+    ],
+    "gaps": [
+      {
+        "topic": "<feature/topic from answer key they missed>",
+        "importance": "critical" | "important" | "minor",
+        "what_candidate_said": "<exact quote from transcript, or 'Not mentioned' if they never addressed it>",
+        "what_was_missing": "<1-2 sentence summary of the gap>",
+        "answer_key_excerpt": "<DIRECT QUOTE from the answer key showing what they should have covered - copy the actual text>",
+        "example_good_response": "<Concrete example of what a strong candidate would SAY in the interview, written as if they were speaking>"
+      }
+    ]
+  },
+
+  "recommendations": [
+    {
+      "title": "<short title>",
+      "explanation": "<detailed explanation with specific example from answer key>",
+      "example": "<concrete example of what to say>"
+    }
+  ],
+
+  "summary": "<1-2 paragraph summary - be direct about whether they would pass at Google>"
+}
+
+## RATING DECISION TREE
+
+STYLE:
+- If requirements_gathering = "skipped" → "needs_improvement" (AUTOMATIC)
+- If requirements_gathering = "partial" (missing functional OR non-functional) → Cannot be "strong"
+- If they did NO capacity estimates → Cannot be "strong"
+- If they needed prompting for capacity estimates → "adequate" at best
+- If they drove the conversation unprompted with thorough requirements AND structure → Consider "strong"
+
+COMPLETENESS:
+- If answer_key_coverage_percent < 50% → "incomplete"
+- If answer_key_coverage_percent 50-75% → "adequate"
+- If answer_key_coverage_percent > 75% with depth → "comprehensive"
+- If they missed ANY critical topic (ID generation, DB choice, caching) → Cannot be "comprehensive"
+
+REQUIREMENTS GATHERING IS NON-NEGOTIABLE:
+- A candidate who jumps into design without clarifying requirements is showing a red flag.
+- Even if their design is technically correct, skipping requirements = "needs_improvement" for style.
+- This is how senior engineers work - they ALWAYS clarify before designing.
+
+DEFAULT TO LOWER RATINGS. "strong" and "comprehensive" are RARE. Most candidates are "adequate" or worse.
+
+Remember: You're ${SYSTEM_DESIGN_PERSONA.name}, a ${SYSTEM_DESIGN_PERSONA.role} at ${SYSTEM_DESIGN_PERSONA.company}. Grade like you're deciding whether to hire this person for your team.`
+
+  return personaInstructions + outputFormat
+}
 
 export async function evaluateSystemDesignInterview(
   input: SystemDesignEvaluationInput,
@@ -331,94 +342,199 @@ export async function evaluateSystemDesignInterview(
   const { model = 'anthropic/claude-sonnet-4' } = options
 
   const diagramSummary = summarizeDiagram(input.drawingData?.elements)
+  const referenceSolutionText = formatReferenceSolutions(input.referenceSolutions)
+  const hasReference = input.referenceSolutions?.solutions && input.referenceSolutions.solutions.length > 0
 
-  const userPrompt = `## System Design Question
+  // Build the system prompt with persona and reference solution
+  const systemPrompt = buildSystemDesignEvaluationPrompt(
+    hasReference ? referenceSolutionText : undefined
+  )
 
-**Title:** ${input.questionTitle}
-**Difficulty:** ${input.questionDifficulty}
+  const userPrompt = `## QUESTION
 
-**Description:**
+**${input.questionTitle}** (${input.questionDifficulty})
+
 ${input.questionDescription}
 
-${input.keyConsiderations && input.keyConsiderations.length > 0
-  ? `**Key Considerations:**\n${input.keyConsiderations.map(c => `- ${c}`).join('\n')}`
-  : ''}
+${input.keyConsiderations?.length ? `**Key Considerations:**\n${input.keyConsiderations.map(c => `- ${c}`).join('\n')}` : ''}
 
 ---
 
-## Candidate's Diagram
+## CANDIDATE'S TRANSCRIPT
 
-**Diagram Summary:**
+${formatTranscript(input.transcript)}
+
+---
+
+## CANDIDATE'S DIAGRAM
+
 ${diagramSummary}
 
-**Raw Excalidraw Elements (for reference):**
+Raw elements:
 \`\`\`json
 ${JSON.stringify(input.drawingData?.elements || [], null, 2)}
 \`\`\`
 
 ---
 
-## Candidate's Notes
+## CANDIDATE'S NOTES
 
-${input.notes || 'No notes provided'}
-
----
-
-## Interview Transcript
-
-${formatTranscript(input.transcript)}
+${input.notes || '(No notes)'}
 
 ---
 
-## Session Info
+## TIME
 
-- **Time Spent:** ${Math.floor(input.timeSpentSeconds / 60)} minutes ${input.timeSpentSeconds % 60} seconds
-- **Time Limit:** ${Math.floor(input.timeLimitSeconds / 60)} minutes
+Spent: ${Math.floor(input.timeSpentSeconds / 60)}m ${input.timeSpentSeconds % 60}s / Limit: ${Math.floor(input.timeLimitSeconds / 60)}m
 
 ---
 
-Please evaluate this system design interview and provide your assessment in the JSON format specified.`
+Please provide detailed feedback on this candidate's system design interview, evaluating their STYLE and COMPLETENESS.`
 
   try {
-    const result = await llm.generateJSON<SystemDesignEvaluationResult>(
+    const result = await llm.generateJSON<{
+      style: SystemDesignFeedback['style'] & {
+        requirements_gathering?: 'thorough' | 'partial' | 'skipped'
+        functional_requirements_covered?: boolean
+        non_functional_requirements_covered?: boolean
+        did_capacity_estimates?: boolean
+        capacity_estimates_prompted?: boolean
+      }
+      completeness: SystemDesignFeedback['completeness'] & {
+        answer_key_coverage_percent?: number
+      }
+      recommendations: SystemDesignFeedback['recommendations']
+      summary: string
+    }>(
       [
-        { role: 'system', content: SYSTEM_DESIGN_EVALUATION_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { model, temperature: 0.3, maxTokens: 4000 }
+      { model, temperature: 0.3, maxTokens: 8000 }
     )
 
-    // Validate and clamp scores
-    const clampScore = (score: number) => Math.max(0, Math.min(100, Math.round(score)))
+    // Convert ratings to numeric scores for backward compatibility
+    // STRICT SCORING: "adequate" is passing but not impressive, "needs_improvement" is failing
+    const styleScore = result.style.rating === 'strong' ? 85 :
+                       result.style.rating === 'adequate' ? 55 : 35
+    const completenessScore = result.completeness.rating === 'comprehensive' ? 85 :
+                              result.completeness.rating === 'adequate' ? 55 : 35
+    // Completeness weighted more heavily (70%) - what you cover matters more than how you say it
+    const overallScore = Math.round(styleScore * 0.3 + completenessScore * 0.7)
 
-    // Calculate overall if missing
-    let overallScore = result.overall_score
-    if (typeof overallScore !== 'number') {
-      overallScore = Math.round(
-        result.requirements_gathering_score * 0.10 +
-        result.system_components_score * 0.20 +
-        result.scalability_score * 0.20 +
-        result.data_model_score * 0.15 +
-        result.api_design_score * 0.10 +
-        result.trade_offs_score * 0.15 +
-        result.communication_score * 0.10
-      )
+    // Build legacy detailed_notes from the new assessment
+    const legacyNotes = {
+      requirements: result.style.assessment.substring(0, 200) + '...',
+      architecture: result.completeness.assessment.substring(0, 200) + '...',
+      scalability: '',
+      data_model: '',
+      api_design: '',
+      trade_offs: '',
+      communication: result.style.assessment.substring(0, 200) + '...',
+    }
+
+    const feedback: SystemDesignFeedback = {
+      style: {
+        rating: result.style?.rating || 'adequate',
+        assessment: result.style?.assessment || '',
+        requirements_gathering: result.style?.requirements_gathering ?? 'skipped',
+        functional_requirements_covered: result.style?.functional_requirements_covered ?? false,
+        non_functional_requirements_covered: result.style?.non_functional_requirements_covered ?? false,
+        did_capacity_estimates: result.style?.did_capacity_estimates ?? false,
+        capacity_estimates_prompted: result.style?.capacity_estimates_prompted ?? false,
+        strengths: result.style?.strengths || [],
+        improvements: result.style?.improvements || []
+      },
+      completeness: {
+        rating: result.completeness?.rating || 'adequate',
+        assessment: result.completeness?.assessment || '',
+        answer_key_coverage_percent: result.completeness?.answer_key_coverage_percent ?? 50,
+        covered_well: result.completeness?.covered_well || [],
+        // Map gaps to ensure all new fields are present
+        gaps: (result.completeness?.gaps || []).map(gap => ({
+          topic: gap.topic || '',
+          importance: gap.importance || 'important',
+          what_candidate_said: gap.what_candidate_said || 'Not mentioned',
+          what_was_missing: gap.what_was_missing || '',
+          answer_key_excerpt: gap.answer_key_excerpt || '',
+          example_good_response: gap.example_good_response || ''
+        }))
+      },
+      recommendations: result.recommendations || [],
+      summary: result.summary || 'Evaluation completed.',
+
+      // Legacy fields
+      good_points: result.style?.strengths?.map(s => s.point) || [],
+      areas_for_improvement: result.completeness?.gaps?.map(g => g.topic) || [],
+      detailed_notes: legacyNotes,
+      missed_components: result.completeness?.gaps?.map(g => g.topic) || [],
+      study_recommendations: result.recommendations?.map(r => r.title) || [],
     }
 
     return {
-      requirements_gathering_score: clampScore(result.requirements_gathering_score),
-      system_components_score: clampScore(result.system_components_score),
-      scalability_score: clampScore(result.scalability_score),
-      data_model_score: clampScore(result.data_model_score),
-      api_design_score: clampScore(result.api_design_score),
-      trade_offs_score: clampScore(result.trade_offs_score),
-      communication_score: clampScore(result.communication_score),
-      overall_score: clampScore(overallScore),
+      style_rating: result.style?.rating || 'adequate',
+      completeness_rating: result.completeness?.rating || 'adequate',
+
+      // Numeric scores for backward compatibility
+      clarity_score: styleScore,
+      structure_score: styleScore,
+      correctness_score: completenessScore,
+      requirements_gathering_score: styleScore,
+      system_components_score: completenessScore,
+      scalability_score: completenessScore,
+      data_model_score: completenessScore,
+      api_design_score: completenessScore,
+      trade_offs_score: styleScore,
+      communication_score: styleScore,
+      overall_score: overallScore,
+
+      feedback,
+    }
+  } catch (error) {
+    console.error('[SYSTEM_DESIGN_EVALUATION] Error:', error)
+
+    // Fallback evaluation
+    const hasContent = (input.drawingData?.elements?.length || 0) > 0 ||
+                       (input.notes?.length || 0) > 0 ||
+                       (input.transcript?.length || 0) > 0
+
+    return {
+      style_rating: 'adequate',
+      completeness_rating: 'adequate',
+      clarity_score: 50,
+      structure_score: 50,
+      correctness_score: 50,
+      requirements_gathering_score: 50,
+      system_components_score: 50,
+      scalability_score: 50,
+      data_model_score: 50,
+      api_design_score: 50,
+      trade_offs_score: 50,
+      communication_score: 50,
+      overall_score: 50,
       feedback: {
-        summary: result.feedback?.summary || 'Evaluation completed.',
-        good_points: result.feedback?.good_points || [],
-        areas_for_improvement: result.feedback?.areas_for_improvement || [],
-        detailed_notes: result.feedback?.detailed_notes || {
+        style: {
+          rating: 'adequate',
+          assessment: 'Unable to generate detailed feedback due to an error.',
+          strengths: hasContent ? [{ point: 'Submitted work', example: 'Diagram and/or notes were provided' }] : [],
+          improvements: []
+        },
+        completeness: {
+          rating: 'adequate',
+          assessment: 'Unable to compare against reference solution.',
+          covered_well: [],
+          gaps: []
+        },
+        recommendations: [
+          {
+            title: 'Try again',
+            explanation: 'We encountered an error generating feedback. Please try submitting again.'
+          }
+        ],
+        summary: 'Evaluation could not be completed. Please try again.',
+        good_points: [],
+        areas_for_improvement: [],
+        detailed_notes: {
           requirements: '',
           architecture: '',
           scalability: '',
@@ -427,51 +543,8 @@ Please evaluate this system design interview and provide your assessment in the 
           trade_offs: '',
           communication: '',
         },
-        missed_components: result.feedback?.missed_components || [],
-        study_recommendations: result.feedback?.study_recommendations || [],
-        key_takeaway: result.feedback?.key_takeaway || 'Keep practicing!',
-      },
-    }
-  } catch (error) {
-    console.error('[SYSTEM_DESIGN_EVALUATION] Error generating evaluation:', error)
-
-    // Return a basic evaluation
-    const hasDrawing = input.drawingData && input.drawingData.elements.length > 0
-    const hasNotes = input.notes && input.notes.length > 0
-    const hasTranscript = input.transcript && input.transcript.length > 0
-
-    const baseScore = 50
-    const drawingBonus = hasDrawing ? 10 : 0
-    const notesBonus = hasNotes ? 5 : 0
-    const transcriptBonus = hasTranscript ? 5 : 0
-
-    const basicScore = baseScore + drawingBonus + notesBonus + transcriptBonus
-
-    return {
-      requirements_gathering_score: basicScore,
-      system_components_score: basicScore,
-      scalability_score: basicScore,
-      data_model_score: basicScore,
-      api_design_score: basicScore,
-      trade_offs_score: basicScore,
-      communication_score: basicScore,
-      overall_score: basicScore,
-      feedback: {
-        summary: 'Unable to generate detailed AI feedback. Basic evaluation provided.',
-        good_points: hasDrawing ? ['Created a system diagram'] : [],
-        areas_for_improvement: ['Unable to generate detailed feedback'],
-        detailed_notes: {
-          requirements: 'Evaluation unavailable',
-          architecture: 'Evaluation unavailable',
-          scalability: 'Evaluation unavailable',
-          data_model: 'Evaluation unavailable',
-          api_design: 'Evaluation unavailable',
-          trade_offs: 'Evaluation unavailable',
-          communication: 'Evaluation unavailable',
-        },
         missed_components: [],
-        study_recommendations: ['Practice more system design problems'],
-        key_takeaway: 'Keep practicing and try again!',
+        study_recommendations: [],
       },
     }
   }

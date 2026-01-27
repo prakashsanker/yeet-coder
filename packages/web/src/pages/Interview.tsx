@@ -103,11 +103,9 @@ export default function Interview() {
   const {
     voiceState,
     currentTranscript,
-    isConnected: isWsConnected,
-    isGeneratingIntro,
     startListening,
     stopListening,
-    playRealtimeIntroduction,
+    playCachedIntroduction,
     isAlwaysListening,
     isSpeechDetected,
     enableAlwaysListening,
@@ -233,27 +231,26 @@ export default function Interview() {
     }
   }, [interviewIdParam, code, timeSpentSeconds])
 
-  // Generate and play introduction using Realtime API voice (same as conversation)
-  // This is triggered when WebSocket connects and question is loaded
+  // Generate introduction with pre-generated TTS audio (faster than Realtime API)
+  // This starts as soon as question data is loaded - no WebSocket dependency
   useEffect(() => {
     // Skip if intro was already played or this is a resumed session
     if (hasIntroduced || isResumedSession) {
       return
     }
 
-    // Need WebSocket connection and question data
-    if (!isWsConnected || !questionData || !questionContext) {
+    // Need question data
+    if (!questionData || !questionContext) {
       return
     }
 
     // Already generating or have cached intro
-    if (isPreloading || isGeneratingIntro || cachedIntro) {
+    if (isPreloading || cachedIntro) {
       return
     }
 
-    // First, generate the introduction text via REST API (fast, text-only)
-    // Then generate audio via Realtime API WebSocket for voice consistency
-    console.log('[INTRO] Generating introduction text...')
+    // Generate introduction text AND audio via REST API (using OpenAI TTS - faster than Realtime API)
+    console.log('[INTRO] Generating introduction with audio...')
     setIsPreloading(true)
 
     fetch(`${API_URL}/api/voice/introduce`, {
@@ -261,7 +258,7 @@ export default function Interview() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         current_question: questionContext,
-        include_audio: false, // Don't use TTS - we'll use Realtime API for audio
+        include_audio: true, // Use OpenAI TTS for pre-generated audio (faster than Realtime API)
       }),
     })
       .then((res) => {
@@ -272,37 +269,37 @@ export default function Interview() {
       })
       .then((data) => {
         if (data.success && data.text) {
-          console.log('[INTRO] Got introduction text, generating audio via Realtime API...')
-          // Store the text, audio will be generated via Realtime API
-          setCachedIntro({ text: data.text })
+          console.log('[INTRO] Got introduction with audio, ready to play immediately')
+          // Store both text and pre-generated audio
+          setCachedIntro({ text: data.text, audio: data.audio })
         } else {
           console.error('[INTRO] API returned unsuccessful response:', data)
         }
       })
       .catch((err) => {
-        console.error('[INTRO] Failed to generate introduction text:', err)
+        console.error('[INTRO] Failed to generate introduction:', err)
       })
       .finally(() => {
         setIsPreloading(false)
       })
-  }, [questionData, questionContext, isWsConnected, cachedIntro, isPreloading, isGeneratingIntro, hasIntroduced, isResumedSession])
+  }, [questionData, questionContext, cachedIntro, isPreloading, hasIntroduced, isResumedSession])
 
-  // Play intro when text is ready - use Realtime API for audio
+  // Play intro when audio is ready - use pre-generated TTS audio (faster)
   useEffect(() => {
-    if (cachedIntro && !hasIntroduced && questionData && !isResumedSession && isWsConnected) {
+    if (cachedIntro && !hasIntroduced && questionData && !isResumedSession) {
       setHasIntroduced(true)
       // Persist to localStorage so refresh doesn't replay intro
       if (interviewIdParam) {
         localStorage.setItem(`intro_played_${interviewIdParam}`, 'true')
       }
 
-      // Use Realtime API to generate and play audio (same voice as conversation)
+      // Play pre-generated audio immediately (no WebSocket dependency for intro playback)
       setTimeout(() => {
-        console.log('[INTRO] Playing introduction with Realtime API voice...')
-        playRealtimeIntroduction(cachedIntro.text)
-      }, 500)
+        console.log('[INTRO] Playing pre-generated introduction audio...')
+        playCachedIntroduction(cachedIntro)
+      }, 300)
     }
-  }, [cachedIntro, hasIntroduced, questionData, playRealtimeIntroduction, interviewIdParam, isResumedSession, isWsConnected])
+  }, [cachedIntro, hasIntroduced, questionData, playCachedIntroduction, interviewIdParam, isResumedSession])
 
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode)
@@ -618,14 +615,13 @@ export default function Interview() {
   }
 
   // Waiting for intro to generate (skip for resumed sessions)
-  if (!cachedIntro && (isPreloading || isGeneratingIntro || !isWsConnected) && !isResumedSession && !hasIntroduced) {
+  // Note: We don't need WebSocket connected for intro - it uses pre-generated TTS audio
+  if (!cachedIntro && isPreloading && !isResumedSession && !hasIntroduced) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-page)]">
         <div className="text-center">
           <div className="spinner w-12 h-12 mx-auto mb-4"></div>
-          <p className="text-[var(--text-muted)]">
-            {!isWsConnected ? 'Connecting to voice service...' : isGeneratingIntro ? 'Generating introduction...' : 'Preparing AI interviewer...'}
-          </p>
+          <p className="text-[var(--text-muted)]">Preparing AI interviewer...</p>
         </div>
       </div>
     )

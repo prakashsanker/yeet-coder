@@ -11,7 +11,9 @@
 
 import type { InterviewWebSocket, WebSocketMessage } from './index.js'
 import { sendMessage } from './index.js'
-import { OpenAIRealtimeClient } from '../services/openai-realtime.js'
+import { OpenAIRealtimeClient, type RealtimeSessionConfig } from '../services/openai-realtime.js'
+import { supabase } from '../db/supabase.js'
+import type { InterviewType } from '../services/interviewerPersona.js'
 
 export interface RealtimeVoiceSession {
   realtimeClient: OpenAIRealtimeClient
@@ -73,6 +75,53 @@ export async function handleRealtimeVoiceMessage(
 }
 
 /**
+ * Fetch interview metadata for building the session config
+ */
+async function fetchInterviewMetadata(interviewId: string): Promise<{
+  interviewType: InterviewType
+  problemTitle?: string
+  problemDescription?: string
+  keyConsiderations?: string[]
+}> {
+  try {
+    const { data: interview, error } = await supabase
+      .from('interview_sessions')
+      .select(`
+        session_type,
+        question:questions(
+          title,
+          description,
+          metadata
+        )
+      `)
+      .eq('id', interviewId)
+      .single()
+
+    if (error || !interview) {
+      console.warn(`[RealtimeHandler] Could not fetch interview ${interviewId}:`, error)
+      return { interviewType: 'coding' }
+    }
+
+    const sessionType = (interview.session_type || 'coding') as InterviewType
+    const question = interview.question as {
+      title?: string
+      description?: string
+      metadata?: { key_considerations?: string[] }
+    } | null
+
+    return {
+      interviewType: sessionType,
+      problemTitle: question?.title,
+      problemDescription: question?.description,
+      keyConsiderations: question?.metadata?.key_considerations,
+    }
+  } catch (err) {
+    console.error(`[RealtimeHandler] Error fetching interview metadata:`, err)
+    return { interviewType: 'coding' }
+  }
+}
+
+/**
  * Start a new Realtime API session
  */
 async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
@@ -97,17 +146,29 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
 
   console.log(`[RealtimeHandler] Starting session for interview ${ws.interviewId}`)
 
+  // Fetch interview metadata to configure the persona correctly
+  const interviewMeta = await fetchInterviewMetadata(ws.interviewId)
+  console.log(`[RealtimeHandler] Interview type: ${interviewMeta.interviewType}, problem: ${interviewMeta.problemTitle || 'N/A'}`)
+
   // Get stored context from the WebSocket object
   const storedContext = ws.interviewContext || { currentQuestion: '', userCode: '' }
   console.log(`[RealtimeHandler] Using stored context - question length: ${storedContext.currentQuestion.length}, code length: ${storedContext.userCode.length}`)
 
+  // Build session config with interview-specific persona
+  const sessionConfig: RealtimeSessionConfig = {
+    voice: 'ash',
+    turnDetection: 'server_vad', // Let OpenAI handle turn detection
+    temperature: 0.6,
+    // Pass interview type and problem context for persona configuration
+    interviewType: interviewMeta.interviewType,
+    problemTitle: interviewMeta.problemTitle,
+    problemDescription: interviewMeta.problemDescription,
+    keyConsiderations: interviewMeta.keyConsiderations,
+  }
+
   // Create event handlers that relay to the client WebSocket
   const realtimeClient = new OpenAIRealtimeClient(
-    {
-      voice: 'ash',
-      turnDetection: 'server_vad', // Let OpenAI handle turn detection
-      temperature: 0.6,
-    },
+    sessionConfig,
     {
       onSessionCreated: () => {
         console.log(`[RealtimeHandler] Session created for ${ws.interviewId}`)
@@ -255,12 +316,20 @@ async function handleIntroductionRequest(ws: InterviewWebSocket, introductionTex
 
   console.log(`[RealtimeHandler] Generating introduction for interview ${ws.interviewId}`)
 
-  // Create a temporary Realtime client for the introduction
+  // Fetch interview metadata to use correct persona
+  const interviewMeta = await fetchInterviewMetadata(ws.interviewId)
+
+  // Create a temporary Realtime client for the introduction with correct persona
   const realtimeClient = new OpenAIRealtimeClient(
     {
       voice: 'ash', // Same voice as conversation
       turnDetection: 'none', // No VAD needed for introduction
       temperature: 0.6,
+      // Use correct persona based on interview type
+      interviewType: interviewMeta.interviewType,
+      problemTitle: interviewMeta.problemTitle,
+      problemDescription: interviewMeta.problemDescription,
+      keyConsiderations: interviewMeta.keyConsiderations,
     },
     {
       onSessionCreated: () => {

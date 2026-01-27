@@ -76,11 +76,41 @@ export interface Question {
     visible_test_cases?: TestCase[]
     hidden_test_cases?: TestCase[]
     starter_code?: StarterCode
+    // System design specific metadata
+    key_considerations?: string[]
+    companies?: string[]
+    solution_links?: Array<{ label: string; url: string }>
+    // Reference solutions for grading (multiple sources combined)
+    reference_solutions?: SystemDesignReferenceSolutions
   }
   hints?: string[]
   solution_explanation?: string
   created_at: string
   updated_at: string
+}
+
+// A single scraped reference solution from an external resource
+export interface ScrapedSolution {
+  // The scraped solution content
+  solution_text: string
+  // Source URL where the solution was scraped from
+  source_url: string
+  // Source label (e.g., "Substack", "Dev.to", "Medium")
+  source_label: string
+  // When the solution was scraped
+  scraped_at: string
+}
+
+// Collection of reference solutions for system design questions (used as answer key for grading)
+export interface SystemDesignReferenceSolutions {
+  // All scraped solutions combined make up the comprehensive answer key
+  solutions: ScrapedSolution[]
+  // LLM-synthesized answer key combining all sources (used for grading if available)
+  synthesized_answer_key?: string
+  // When the answer key was generated
+  generated_at?: string
+  // When the collection was last updated (legacy field)
+  last_updated?: string
 }
 
 export interface StarterCode {
@@ -155,6 +185,13 @@ export interface Evaluation {
   api_design_score?: number
   trade_offs_score?: number
   communication_score?: number
+  // Enhanced system design evaluation
+  clarity_score?: number
+  structure_score?: number
+  correctness_score?: number
+  // Qualitative ratings (new approach)
+  style_rating?: 'strong' | 'adequate' | 'needs_improvement'
+  completeness_rating?: 'comprehensive' | 'adequate' | 'incomplete'
   // Common fields
   overall_score?: number
   verdict?: 'PASS' | 'FAIL'
@@ -174,9 +211,75 @@ export interface EvaluationFeedback {
   detailed_notes: string
 }
 
-// System design interview feedback
+// System design interview feedback - focused on Style and Completeness
 export interface SystemDesignFeedback {
+  // === STYLE ASSESSMENT ===
+  // How they approached the problem: clarity, structure, diagrams, trade-off consideration
+  style: {
+    // Overall rating for style
+    rating: 'strong' | 'adequate' | 'needs_improvement'
+    // Long-form narrative assessment of their style
+    assessment: string
+    // How well did they gather requirements?
+    requirements_gathering?: 'thorough' | 'partial' | 'skipped'
+    // Did they clarify functional requirements (features, scope)?
+    functional_requirements_covered?: boolean
+    // Did they clarify non-functional requirements (scale, latency, availability)?
+    non_functional_requirements_covered?: boolean
+    // Did they do capacity estimates (QPS, storage, bandwidth, memory)?
+    did_capacity_estimates?: boolean
+    // Were estimates prompted by interviewer (vs unprompted)?
+    capacity_estimates_prompted?: boolean
+    // Specific things they did well (with examples from their answer)
+    strengths: Array<{
+      point: string
+      example: string  // Quote or reference from their actual answer
+    }>
+    // Specific areas to improve (with concrete suggestions)
+    improvements: Array<{
+      point: string
+      what_they_did: string      // What they actually said/did
+      what_would_be_better: string  // How to improve
+    }>
+  }
+
+  // === COMPLETENESS ASSESSMENT ===
+  // What they covered vs the answer key
+  completeness: {
+    // Overall rating for completeness
+    rating: 'comprehensive' | 'adequate' | 'incomplete'
+    // Long-form narrative of what was covered vs missed
+    assessment: string
+    // Percentage of answer key topics covered (0-100)
+    answer_key_coverage_percent?: number
+    // Features/topics they covered well
+    covered_well: Array<{
+      topic: string
+      detail: string  // How well they covered it
+    }>
+    // Features/topics that were missing or incomplete
+    gaps: Array<{
+      topic: string
+      importance: 'critical' | 'important' | 'minor'
+      what_candidate_said: string  // What they actually said (or "Not mentioned")
+      what_was_missing: string     // Brief description of the gap
+      answer_key_excerpt: string   // Direct quote/excerpt from answer key showing what they SHOULD have said
+      example_good_response: string // Concrete example of what a strong candidate would say
+    }>
+  }
+
+  // === KEY RECOMMENDATIONS ===
+  // Top 3-5 actionable recommendations to improve
+  recommendations: Array<{
+    title: string
+    explanation: string
+    example?: string  // Optional concrete example
+  }>
+
+  // Overall summary (1-2 paragraphs)
   summary: string
+
+  // Legacy fields for backward compatibility
   good_points: string[]
   areas_for_improvement: string[]
   detailed_notes: {
@@ -190,7 +293,6 @@ export interface SystemDesignFeedback {
   }
   missed_components: string[]
   study_recommendations: string[]
-  key_takeaway: string
 }
 
 export interface SolutionStep {
