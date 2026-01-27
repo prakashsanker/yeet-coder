@@ -6,6 +6,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY
 // OpenRouter models
 export type OpenRouterModel =
   | 'anthropic/claude-opus-4'
+  | 'anthropic/claude-opus-4.5'
   | 'anthropic/claude-sonnet-4'
   | 'openai/gpt-4o'
   | 'openai/gpt-4o-mini'
@@ -106,21 +107,46 @@ export async function generateText(
 }
 
 /**
- * Strip markdown code blocks from a string
- * Handles ```json ... ``` and ``` ... ``` formats
+ * Extract JSON from LLM response
+ * Handles various formats:
+ * - Pure JSON
+ * - JSON wrapped in ```json ... ```
+ * - Text followed by JSON (common with Claude)
+ * - JSON embedded in text
  */
-function stripMarkdownCodeBlocks(content: string): string {
+function extractJSON(content: string): string {
   let stripped = content.trim()
 
-  // Handle ```json\n...\n``` format
-  if (stripped.startsWith('```json')) {
-    stripped = stripped.slice(7)
-  } else if (stripped.startsWith('```')) {
-    stripped = stripped.slice(3)
+  // First, try to find JSON in markdown code blocks
+  const codeBlockMatch = stripped.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeBlockMatch) {
+    stripped = codeBlockMatch[1].trim()
+  } else {
+    // Handle simple ```json at start
+    if (stripped.startsWith('```json')) {
+      stripped = stripped.slice(7)
+    } else if (stripped.startsWith('```')) {
+      stripped = stripped.slice(3)
+    }
+    if (stripped.endsWith('```')) {
+      stripped = stripped.slice(0, -3)
+    }
   }
 
-  if (stripped.endsWith('```')) {
-    stripped = stripped.slice(0, -3)
+  // If still not valid JSON, try to find JSON object/array in the text
+  stripped = stripped.trim()
+  if (!stripped.startsWith('{') && !stripped.startsWith('[')) {
+    // Try to find a JSON object
+    const jsonObjectMatch = stripped.match(/(\{[\s\S]*\})/)
+    if (jsonObjectMatch) {
+      stripped = jsonObjectMatch[1]
+    } else {
+      // Try to find a JSON array
+      const jsonArrayMatch = stripped.match(/(\[[\s\S]*\])/)
+      if (jsonArrayMatch) {
+        stripped = jsonArrayMatch[1]
+      }
+    }
   }
 
   return stripped.trim()
@@ -186,8 +212,8 @@ export async function generateJSON<T>(
     throw new Error('No content in LLM response')
   }
 
-  // Strip markdown code blocks if present (LLMs sometimes wrap despite instructions)
-  let jsonContent = stripMarkdownCodeBlocks(content)
+  // Extract JSON from response (handles text before JSON, markdown blocks, etc.)
+  let jsonContent = extractJSON(content)
 
   // Sanitize control characters in string values (common issue with smaller models)
   jsonContent = sanitizeJsonString(jsonContent)

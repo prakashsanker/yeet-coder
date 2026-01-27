@@ -146,9 +146,10 @@ router.post('/respond', async (req: Request, res: Response) => {
 // POST /api/voice/introduce - Get an introduction for the interview
 router.post('/introduce', async (req: Request, res: Response) => {
   try {
-    const { current_question, include_audio } = req.body as {
+    const { current_question, include_audio, session_type } = req.body as {
       current_question: string
       include_audio?: boolean
+      session_type?: 'coding' | 'system_design'
     }
 
     if (!current_question) {
@@ -156,8 +157,9 @@ router.post('/introduce', async (req: Request, res: Response) => {
       return
     }
 
-    // Generate introduction using the interviewer
-    const introduction = await getInterviewerResponse([], current_question, '')
+    // Generate introduction using the interviewer with correct persona
+    const interviewType = session_type || 'coding'
+    const introduction = await getInterviewerResponse([], current_question, '', interviewType)
 
     let audio: string | undefined
     if (include_audio && isOpenAIConfigured()) {

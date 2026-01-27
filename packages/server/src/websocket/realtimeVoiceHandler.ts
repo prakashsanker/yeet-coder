@@ -10,10 +10,15 @@
  */
 
 import type { InterviewWebSocket, WebSocketMessage } from './index.js'
-import { sendMessage } from './index.js'
+import { sendMessage, addToConversationHistory } from './index.js'
 import { OpenAIRealtimeClient, type RealtimeSessionConfig } from '../services/openai-realtime.js'
 import { supabase } from '../db/supabase.js'
 import type { InterviewType } from '../services/interviewerPersona.js'
+import {
+  buildConversationContext,
+  formatContextForInstructions,
+  getTokenStats,
+} from '../services/conversationContext.js'
 
 export interface RealtimeVoiceSession {
   realtimeClient: OpenAIRealtimeClient
@@ -154,6 +159,24 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
   const storedContext = ws.interviewContext || { currentQuestion: '', userCode: '' }
   console.log(`[RealtimeHandler] Using stored context - question length: ${storedContext.currentQuestion.length}, code length: ${storedContext.userCode.length}`)
 
+  // Build conversation context from history (with compaction if needed)
+  let conversationContext: string | undefined
+  if (ws.conversationHistory && ws.conversationHistory.length > 0) {
+    const tokenStats = getTokenStats(ws.conversationHistory)
+    console.log(`[RealtimeHandler] Token stats: ${tokenStats.totalTokens} tokens, ${tokenStats.messageCount} messages, ${tokenStats.percentUsed}% capacity`)
+
+    if (tokenStats.needsCompaction) {
+      console.log(`[RealtimeHandler] Compacting conversation history...`)
+      const context = await buildConversationContext(ws.conversationHistory)
+      conversationContext = formatContextForInstructions(context)
+      console.log(`[RealtimeHandler] Compacted to ${context.totalTokens} tokens`)
+    } else {
+      // Just format recent history without summarization
+      const context = await buildConversationContext(ws.conversationHistory)
+      conversationContext = formatContextForInstructions(context)
+    }
+  }
+
   // Build session config with interview-specific persona
   const sessionConfig: RealtimeSessionConfig = {
     voice: 'ash',
@@ -164,6 +187,14 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
     problemTitle: interviewMeta.problemTitle,
     problemDescription: interviewMeta.problemDescription,
     keyConsiderations: interviewMeta.keyConsiderations,
+    // Pass the introduction that was already given for context continuity
+    introductionGiven: ws.introductionGiven,
+    // Pass conversation history context
+    conversationContext,
+  }
+
+  if (ws.introductionGiven) {
+    console.log(`[RealtimeHandler] Including intro context: "${ws.introductionGiven.substring(0, 50)}..."`)
   }
 
   // Create event handlers that relay to the client WebSocket
@@ -187,6 +218,8 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
           text: transcript,
           is_final: true,
         })
+        // Add to conversation history
+        addToConversationHistory(ws, 'user', transcript)
       },
 
       onResponseAudioDelta: (delta, _itemId) => {
@@ -207,6 +240,9 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
       onResponseTextDone: (text, _itemId) => {
         console.log(`[RealtimeHandler] AI response: ${text}`)
 
+        // Add to conversation history
+        addToConversationHistory(ws, 'interviewer', text)
+
         // Send complete response to client
         // Include accumulated audio if available
         const audioBuffer = ws.realtimeSession?.audioResponseBuffer || []
@@ -222,6 +258,18 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
         if (ws.realtimeSession) {
           ws.realtimeSession.audioResponseBuffer = []
           ws.realtimeSession.currentTranscript = ''
+        }
+
+        // Persist transcript to database periodically (every few messages)
+        if (ws.conversationHistory && ws.conversationHistory.length % 4 === 0) {
+          saveTranscriptToDatabase(ws).catch((err) => {
+            console.error('[RealtimeHandler] Failed to save transcript:', err)
+          })
+
+          // Also check if we need to compact and update context
+          maybeUpdateConversationContext(ws).catch((err) => {
+            console.error('[RealtimeHandler] Failed to update conversation context:', err)
+          })
         }
       },
 
@@ -355,6 +403,9 @@ async function handleIntroductionRequest(ws: InterviewWebSocket, introductionTex
       onResponseDone: () => {
         console.log(`[RealtimeHandler] Introduction audio generated`)
 
+        // Store the introduction so the conversation session knows what was already said
+        ws.introductionGiven = introductionText
+
         // Send the introduction response with audio
         const audioBuffer = ws.realtimeSession?.audioResponseBuffer || []
         const combinedAudio = audioBuffer.length > 0 ? audioBuffer.join('') : undefined
@@ -427,10 +478,85 @@ export function updateRealtimeContext(
 }
 
 /**
+ * Check if conversation context needs compaction and update the Realtime session
+ * Called periodically as the conversation grows
+ */
+async function maybeUpdateConversationContext(ws: InterviewWebSocket): Promise<void> {
+  if (!ws.conversationHistory || !ws.realtimeSession?.realtimeClient) {
+    return
+  }
+
+  const tokenStats = getTokenStats(ws.conversationHistory)
+  console.log(`[RealtimeHandler] Context check: ${tokenStats.totalTokens} tokens (${tokenStats.percentUsed}% capacity)`)
+
+  // Only update if we're approaching the threshold
+  if (tokenStats.needsCompaction) {
+    console.log(`[RealtimeHandler] Compacting and updating conversation context...`)
+    const context = await buildConversationContext(ws.conversationHistory)
+    const formattedContext = formatContextForInstructions(context)
+
+    ws.realtimeSession.realtimeClient.updateConversationContext(formattedContext)
+    console.log(`[RealtimeHandler] Updated context: ${context.totalTokens} tokens (summary: ${context.summaryTokens || 0}, recent: ${context.recentTokens})`)
+  }
+}
+
+/**
  * Clean up Realtime session when client disconnects
  */
 export function cleanupRealtimeSession(ws: InterviewWebSocket): void {
   if (ws.realtimeSession) {
+    // Save final transcript before cleanup
+    if (ws.conversationHistory && ws.conversationHistory.length > 0) {
+      saveTranscriptToDatabase(ws).catch((err) => {
+        console.error('[RealtimeHandler] Failed to save final transcript:', err)
+      })
+    }
     ws.realtimeSession.cleanup()
+  }
+}
+
+/**
+ * Save the conversation transcript to the database
+ */
+async function saveTranscriptToDatabase(ws: InterviewWebSocket): Promise<void> {
+  if (!ws.interviewId || !ws.conversationHistory || ws.conversationHistory.length === 0) {
+    return
+  }
+
+  const { error } = await supabase
+    .from('interview_sessions')
+    .update({ transcript: ws.conversationHistory })
+    .eq('id', ws.interviewId)
+
+  if (error) {
+    console.error('[RealtimeHandler] Failed to save transcript:', error)
+    throw error
+  }
+
+  console.log(`[RealtimeHandler] Saved transcript (${ws.conversationHistory.length} entries) for interview ${ws.interviewId}`)
+}
+
+/**
+ * Load conversation history from database when joining an interview
+ */
+export async function loadConversationHistory(ws: InterviewWebSocket): Promise<void> {
+  if (!ws.interviewId) {
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('interview_sessions')
+    .select('transcript')
+    .eq('id', ws.interviewId)
+    .single()
+
+  if (error) {
+    console.error('[RealtimeHandler] Failed to load transcript:', error)
+    return
+  }
+
+  if (data?.transcript && Array.isArray(data.transcript)) {
+    ws.conversationHistory = data.transcript
+    console.log(`[RealtimeHandler] Loaded ${ws.conversationHistory.length} transcript entries for interview ${ws.interviewId}`)
   }
 }

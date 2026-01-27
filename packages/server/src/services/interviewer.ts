@@ -1,4 +1,5 @@
 import { generateText, generateJSON, type LLMMessage } from './llm.js'
+import { getPersona, type InterviewType } from './interviewerPersona.js'
 
 interface TranscriptEntry {
   timestamp: number
@@ -6,6 +7,7 @@ interface TranscriptEntry {
   text: string
 }
 
+// Legacy prompt for coding interviews (kept for backward compatibility)
 const INTERVIEWER_SYSTEM_PROMPT = `You are an experienced technical interviewer at a top tech company conducting a coding interview. Your role is to:
 
 1. Be professional, encouraging, and supportive while maintaining interview standards
@@ -25,16 +27,15 @@ Key behaviors:
 
 Remember: You're having a verbal conversation. Keep it natural and avoid overly technical language unless discussing the algorithm directly.`
 
-const GREETING_PROMPT = `Generate a brief, warm greeting to start the coding interview. Mention you'll present a problem and encourage them to think out loud. Keep it to 2-3 sentences.`
-
 export async function getInterviewerResponse(
   transcript: TranscriptEntry[],
   currentQuestion: string,
-  userCode: string
+  userCode: string,
+  interviewType: InterviewType = 'coding'
 ): Promise<string> {
   // If no transcript, generate initial greeting with the problem introduction
   if (transcript.length === 0) {
-    return generateGreeting(currentQuestion)
+    return generateGreeting(currentQuestion, interviewType)
   }
 
   // Build conversation context
@@ -64,32 +65,46 @@ export async function getInterviewerResponse(
   }
 }
 
-async function generateGreeting(currentQuestion?: string): Promise<string> {
+/**
+ * Generate a greeting that matches the persona used in the live interview.
+ * This ensures the cached intro and the Realtime API are aligned.
+ */
+export async function generateGreeting(
+  currentQuestion?: string,
+  interviewType: InterviewType = 'coding'
+): Promise<string> {
   try {
-    // If we have a question, include it in the introduction
+    const persona = getPersona(interviewType)
+
     const prompt = currentQuestion
-      ? `Generate a brief, warm greeting to start the interview. Introduce the following problem and encourage them to think out loud. Keep it to 3-4 sentences.
+      ? `You are ${persona.name}, a ${persona.role} at ${persona.company}. Generate a brief, natural introduction for a ${interviewType === 'system_design' ? 'system design' : 'coding'} interview.
+
+RULES:
+- Be warm and welcoming (1 sentence)
+- State the problem clearly (1 sentence)
+- Ask if they have questions before starting
+- Keep it natural and conversational
+- Do NOT tell them how to approach it or what to cover
+- Do NOT mention frameworks, steps, or methodology
+- Total: 2-3 sentences max
 
 Problem:
 ${currentQuestion}
 
-Your greeting should:
-1. Welcome them warmly
-2. Briefly describe what they'll be working on (summarize the problem in 1 sentence)
-3. Encourage them to think out loud and ask clarifying questions`
-      : GREETING_PROMPT
+Example: "Hey, thanks for joining! Today we'll be designing Instagram - a photo sharing platform. Before we dive in, any questions for me?"`
+      : `Give a brief friendly greeting as ${persona.name} and ask if they have questions.`
 
     const response = await generateText(
       [
-        { role: 'system', content: INTERVIEWER_SYSTEM_PROMPT },
+        { role: 'system', content: `You are ${persona.name}, a ${persona.role} at ${persona.company}. Be warm, natural, and concise.` },
         { role: 'user', content: prompt },
       ],
-      { maxTokens: 200, temperature: 0.8 }
+      { maxTokens: 100, temperature: 0.7 }
     )
     return response
   } catch (error) {
     console.error('Failed to generate greeting:', error)
-    return "Hi! Welcome to your coding interview. I'll present you with a problem, and I'd like you to think out loud as you work through it. Feel free to ask any clarifying questions."
+    return "Hey! Let's get started. Any questions before we begin?"
   }
 }
 

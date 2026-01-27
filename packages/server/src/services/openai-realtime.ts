@@ -18,7 +18,7 @@ import {
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 // Realtime API models
-export type RealtimeModel = 'gpt-4o-realtime-preview' | 'gpt-4o-realtime-preview-2024-12-17'
+export type RealtimeModel = 'gpt-4o-realtime-preview' | 'gpt-4o-realtime-preview-2024-12-17' | 'gpt-4o-mini-realtime-preview' | 'gpt-realtime' | 'gpt-realtime-mini'
 
 // Available voices for Realtime API
 export type RealtimeVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse'
@@ -35,6 +35,10 @@ export interface RealtimeSessionConfig {
   problemTitle?: string
   problemDescription?: string
   keyConsiderations?: string[]
+  // Introduction that was already given (for context continuity)
+  introductionGiven?: string
+  // Conversation history context (may be compacted for long conversations)
+  conversationContext?: string
 }
 
 export interface RealtimeEventHandlers {
@@ -77,7 +81,7 @@ export class OpenAIRealtimeClient {
     )
 
     this.config = {
-      model: 'gpt-4o-realtime-preview',
+      model: 'gpt-realtime-mini',
       voice: 'ash', // Good for interviews - clear, professional
       inputAudioTranscription: true,
       turnDetection: 'server_vad',
@@ -206,8 +210,18 @@ export class OpenAIRealtimeClient {
     const persona = getPersona(this.interviewType)
     let instructions = this.config.instructions || persona.liveInterviewInstructions
 
+    // Include the introduction that was already given for context continuity
+    if (this.config.introductionGiven) {
+      instructions += `\n\n---\n\nYou already introduced yourself and the problem. Your introduction was:\n"${this.config.introductionGiven}"\n\nDo NOT repeat the introduction. The candidate may now ask clarifying questions or start working on the problem.`
+    }
+
+    // Include conversation history (may be compacted for long conversations)
+    if (this.config.conversationContext) {
+      instructions += `\n\n---\n\n${this.config.conversationContext}`
+    }
+
     if (this.currentQuestion) {
-      instructions += `\n\nCurrent coding problem:\n${this.currentQuestion}`
+      instructions += `\n\nCurrent problem:\n${this.currentQuestion}`
     }
 
     if (this.currentCode) {
@@ -232,6 +246,25 @@ export class OpenAIRealtimeClient {
           instructions: this.buildInstructions(),
         },
       })
+    }
+  }
+
+  /**
+   * Update the conversation context (for long conversations)
+   * This is typically called after compacting the history
+   */
+  updateConversationContext(context: string): void {
+    this.config.conversationContext = context
+
+    // Update session with new instructions if connected
+    if (this.isConnected) {
+      this.sendEvent({
+        type: 'session.update',
+        session: {
+          instructions: this.buildInstructions(),
+        },
+      })
+      console.log('[Realtime] Updated conversation context')
     }
   }
 
@@ -281,6 +314,12 @@ export class OpenAIRealtimeClient {
       case 'conversation.item.input_audio_transcription.completed':
         // Transcript of what the user said
         this.handlers.onInputAudioTranscription?.(event.transcript as string)
+        break
+
+      case 'conversation.item.input_audio_transcription.failed':
+        // Transcription failed - log full error details
+        console.error('[Realtime] Input audio transcription FAILED!')
+        console.error('[Realtime] Failure details:', JSON.stringify(event, null, 2))
         break
 
       case 'response.done':
