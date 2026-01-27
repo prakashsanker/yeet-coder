@@ -196,7 +196,7 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
 
     const { data: evaluation, error } = await supabase
       .from('evaluations')
-      .insert(evaluationData)
+      .upsert(evaluationData, { onConflict: 'interview_id' })
       .select()
       .single()
 

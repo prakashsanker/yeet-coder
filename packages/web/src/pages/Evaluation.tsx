@@ -127,6 +127,7 @@ interface EvaluationData {
     drawing_data?: { elements: unknown[] } | null
     notes?: string | null
     question?: {
+      id: string
       title: string
       description: string
       difficulty: string
@@ -197,7 +198,7 @@ export default function Evaluation() {
       <div className="app-page flex items-center justify-center">
         <div className="text-center">
           <div className="spinner w-12 h-12 mx-auto mb-4"></div>
-          <p className="text-lc-text-muted">Loading evaluation...</p>
+          <p className="text-landing-muted">Loading evaluation...</p>
         </div>
       </div>
     )
@@ -207,7 +208,7 @@ export default function Evaluation() {
     return (
       <div className="app-page flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lc-red mb-4">{error || 'Evaluation not found'}</p>
+          <p className="text-red-600 mb-4">{error || 'Evaluation not found'}</p>
           <button
             onClick={() => navigate('/')}
             className="btn-primary"
@@ -237,9 +238,9 @@ export default function Evaluation() {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Question Title */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-2xl font-bold text-lc-text-primary">
+            <h2 className="text-2xl font-bold text-landing-primary">
               {evaluation.interview?.question?.title || 'Interview Completed'}
             </h2>
             {isSystemDesign && (
@@ -263,181 +264,181 @@ export default function Evaluation() {
         </div>
 
         {/* Stats Row - Different for system design vs coding */}
-        {isSystemDesign ? (
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="card p-5 text-center">
-              <div className="text-2xl font-bold text-brand-orange">
-                {formatTime(evaluation.interview?.time_spent_seconds)}
+            {isSystemDesign ? (
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="card p-5 text-center">
+                  <div className="text-2xl font-bold text-accent-purple">
+                    {formatTime(evaluation.interview?.time_spent_seconds)}
+                  </div>
+                  <div className="text-sm text-landing-muted mt-1">Time Spent</div>
+                </div>
+                <div className="card p-5 text-center">
+                  <div className="text-2xl font-bold text-accent-purple">
+                    {evaluation.interview?.transcript?.length || 0}
+                  </div>
+                  <div className="text-sm text-landing-muted mt-1">Conversation Turns</div>
+                </div>
               </div>
-              <div className="text-sm text-lc-text-muted mt-1">Time Spent</div>
-            </div>
-            <div className="card p-5 text-center">
-              <div className="text-2xl font-bold text-brand-orange">
-                {evaluation.interview?.transcript?.length || 0}
+            ) : (
+              <div className="grid grid-cols-4 gap-4 mb-8">
+                <div className="card p-5 text-center">
+                  <div className="text-2xl font-bold text-accent-blue">
+                    {formatTime(evaluation.interview?.time_spent_seconds)}
+                  </div>
+                  <div className="text-sm text-landing-muted mt-1">Time Spent</div>
+                </div>
+                <div className="card p-5 text-center">
+                  <div className="text-2xl font-bold text-accent-blue">
+                    {evaluation.interview?.run_count || 0}
+                  </div>
+                  <div className="text-sm text-landing-muted mt-1">Runs</div>
+                </div>
+                <div className="card p-5 text-center">
+                  <div className="text-2xl font-bold text-accent-blue">
+                    {evaluation.interview?.submit_count || 0}
+                  </div>
+                  <div className="text-sm text-landing-muted mt-1">Submissions</div>
+                </div>
+                <div className="card p-5 text-center">
+                  <div className={`text-2xl font-bold ${overallPassRate >= 70 ? 'text-green-600' : overallPassRate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {overallPassRate}%
+                  </div>
+                  <div className="text-sm text-landing-muted mt-1">Tests Passed</div>
+                </div>
               </div>
-              <div className="text-sm text-lc-text-muted mt-1">Conversation Turns</div>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-4 gap-4 mb-8">
-            <div className="card p-5 text-center">
-              <div className="text-2xl font-bold text-lc-teal">
-                {formatTime(evaluation.interview?.time_spent_seconds)}
-              </div>
-              <div className="text-sm text-lc-text-muted mt-1">Time Spent</div>
-            </div>
-            <div className="card p-5 text-center">
-              <div className="text-2xl font-bold text-lc-teal">
-                {evaluation.interview?.run_count || 0}
-              </div>
-              <div className="text-sm text-lc-text-muted mt-1">Runs</div>
-            </div>
-            <div className="card p-5 text-center">
-              <div className="text-2xl font-bold text-lc-teal">
-                {evaluation.interview?.submit_count || 0}
-              </div>
-              <div className="text-sm text-lc-text-muted mt-1">Submissions</div>
-            </div>
-            <div className="card p-5 text-center">
-              <div className={`text-2xl font-bold ${overallPassRate >= 70 ? 'text-lc-green' : overallPassRate >= 50 ? 'text-lc-yellow' : 'text-lc-red'}`}>
-                {overallPassRate}%
-              </div>
-              <div className="text-sm text-lc-text-muted mt-1">Tests Passed</div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Test Results Breakdown - Only for coding */}
-        {!isSystemDesign && testResults && totalTests > 0 && (
-          <div className="card p-6 mb-8">
-            <h3 className="text-lg font-semibold text-lc-text-primary mb-4">Test Results</h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lc-text-muted">Visible Tests</span>
-                  <span className={`font-semibold ${
-                    testResults.visible.passed === testResults.visible.total ? 'text-lc-green' : 'text-lc-yellow'
-                  }`}>
-                    {testResults.visible.passed}/{testResults.visible.total}
-                  </span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className={`progress-bar-fill ${
-                      testResults.visible.passed === testResults.visible.total ? 'progress-bar-fill-success' : 'progress-bar-fill-warning'
-                    }`}
-                    style={{ width: testResults.visible.total > 0 ? `${(testResults.visible.passed / testResults.visible.total) * 100}%` : '0%' }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lc-text-muted">Hidden Tests</span>
-                  <span className={`font-semibold ${
-                    testResults.hidden.passed === testResults.hidden.total ? 'text-lc-green' : 'text-lc-red'
-                  }`}>
-                    {testResults.hidden.passed}/{testResults.hidden.total}
-                  </span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className={`h-full rounded-full ${
-                      testResults.hidden.passed === testResults.hidden.total ? 'bg-lc-green' : 'bg-lc-red'
-                    }`}
-                    style={{ width: testResults.hidden.total > 0 ? `${(testResults.hidden.passed / testResults.hidden.total) * 100}%` : '0%' }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {hasScores ? (
-          isSystemDesign ? (
-            // System Design Evaluation Display
-            <SystemDesignEvaluationDisplay evaluation={evaluation} />
-          ) : (
-            // Coding Evaluation Display
-            <CodingEvaluationDisplay evaluation={evaluation} />
-          )
-        ) : (
-          /* Pending Evaluation */
-          <div className="card p-8 text-center mb-8">
-            <div className="animate-pulse mb-4">
-              <div className="w-16 h-16 bg-brand-orange/20 rounded-full mx-auto flex items-center justify-center">
-                <svg
-                  className="w-8 h-8 text-brand-orange"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-xl font-semibold text-lc-text-primary mb-2">Interview Submitted!</h3>
-            <p className="text-lc-text-muted mb-4">
-              Your submission has been recorded. AI evaluation is being generated...
-            </p>
-            <p className="text-sm text-lc-text-muted">
-              Refresh the page in a few moments to see your detailed feedback.
-            </p>
-          </div>
-        )}
-
-        {/* User's Custom Test Cases - Only for coding */}
-        {!isSystemDesign && evaluation.user_test_cases && evaluation.user_test_cases.length > 0 && (
-          <div className="card p-6 mb-8">
-            <h3 className="text-lg font-semibold text-lc-text-primary mb-4">Your Custom Test Cases ({evaluation.user_test_cases.length})</h3>
-            <div className="space-y-3">
-              {evaluation.user_test_cases.map((tc, index) => (
-                <div key={index} className="bg-lc-bg-layer-2 rounded-lg p-3">
-                  <div className="text-sm text-lc-text-muted mb-1">Test Case {index + 1}</div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-lc-text-muted">Input:</span>
-                      <pre className="text-lc-text-secondary mt-1 bg-lc-bg-dark p-2 rounded overflow-x-auto">{tc.input || '(empty)'}</pre>
+            {/* Test Results Breakdown - Only for coding */}
+            {!isSystemDesign && testResults && totalTests > 0 && (
+              <div className="card p-6 mb-8">
+                <h3 className="text-lg font-semibold text-landing-primary mb-4">Test Results</h3>
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-landing-muted">Visible Tests</span>
+                      <span className={`font-semibold ${
+                        testResults.visible.passed === testResults.visible.total ? 'text-green-600' : 'text-amber-600'
+                      }`}>
+                        {testResults.visible.passed}/{testResults.visible.total}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-lc-text-muted">Expected:</span>
-                      <pre className="text-lc-text-secondary mt-1 bg-lc-bg-dark p-2 rounded overflow-x-auto">{tc.expected_output || '(empty)'}</pre>
+                    <div className="progress-bar">
+                      <div
+                        className={`progress-bar-fill ${
+                          testResults.visible.passed === testResults.visible.total ? 'progress-bar-fill-success' : 'progress-bar-fill-warning'
+                        }`}
+                        style={{ width: testResults.visible.total > 0 ? `${(testResults.visible.passed / testResults.visible.total) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-landing-muted">Hidden Tests</span>
+                      <span className={`font-semibold ${
+                        testResults.hidden.passed === testResults.hidden.total ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {testResults.hidden.passed}/{testResults.hidden.total}
+                      </span>
+                    </div>
+                    <div className="progress-bar">
+                      <div
+                        className={`h-full rounded-full ${
+                          testResults.hidden.passed === testResults.hidden.total ? 'bg-green-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: testResults.hidden.total > 0 ? `${(testResults.hidden.passed / testResults.hidden.total) * 100}%` : '0%' }}
+                      />
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Submitted Code - Only for coding */}
-        {!isSystemDesign && evaluation.interview?.final_code && (
-          <div className="card p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-lc-text-primary">Your Submitted Code</h3>
-              <span className="badge badge-neutral">
-                {evaluation.interview.language}
-              </span>
-            </div>
-            <pre className="bg-lc-bg-dark rounded-lg p-4 overflow-x-auto text-sm text-lc-text-secondary">
-              <code>{evaluation.interview.final_code}</code>
-            </pre>
-          </div>
-        )}
+            {hasScores ? (
+              isSystemDesign ? (
+                // System Design Evaluation Display
+                <SystemDesignEvaluationDisplay evaluation={evaluation} />
+              ) : (
+                // Coding Evaluation Display
+                <CodingEvaluationDisplay evaluation={evaluation} />
+              )
+            ) : (
+              /* Pending Evaluation */
+              <div className="card p-8 text-center mb-8">
+                <div className="animate-pulse mb-4">
+                  <div className="w-16 h-16 bg-accent-purple/20 rounded-full mx-auto flex items-center justify-center">
+                    <svg
+                      className="w-8 h-8 text-accent-purple"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold text-landing-primary mb-2">Interview Submitted!</h3>
+                <p className="text-landing-muted mb-4">
+                  Your submission has been recorded. AI evaluation is being generated...
+                </p>
+                <p className="text-sm text-landing-muted">
+                  Refresh the page in a few moments to see your detailed feedback.
+                </p>
+              </div>
+            )}
 
-        {/* Notes - Only for system design */}
-        {isSystemDesign && (evaluation.evaluated_notes || evaluation.interview?.notes) && (
-          <div className="card p-6 mb-8">
-            <h3 className="text-lg font-semibold text-lc-text-primary mb-4">Your Notes</h3>
-            <pre className="bg-lc-bg-dark rounded-lg p-4 overflow-x-auto text-sm text-lc-text-secondary whitespace-pre-wrap font-mono">
-              {evaluation.evaluated_notes || evaluation.interview?.notes}
-            </pre>
-          </div>
-        )}
+            {/* User's Custom Test Cases - Only for coding */}
+            {!isSystemDesign && evaluation.user_test_cases && evaluation.user_test_cases.length > 0 && (
+              <div className="card p-6 mb-8">
+                <h3 className="text-lg font-semibold text-landing-primary mb-4">Your Custom Test Cases ({evaluation.user_test_cases.length})</h3>
+                <div className="space-y-3">
+                  {evaluation.user_test_cases.map((tc, index) => (
+                    <div key={index} className="bg-warm-section rounded-lg p-3">
+                      <div className="text-sm text-landing-muted mb-1">Test Case {index + 1}</div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-landing-muted">Input:</span>
+                          <pre className="text-landing-secondary mt-1 bg-landing-primary/5 p-2 rounded overflow-x-auto">{tc.input || '(empty)'}</pre>
+                        </div>
+                        <div>
+                          <span className="text-landing-muted">Expected:</span>
+                          <pre className="text-landing-secondary mt-1 bg-landing-primary/5 p-2 rounded overflow-x-auto">{tc.expected_output || '(empty)'}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Submitted Code - Only for coding */}
+            {!isSystemDesign && evaluation.interview?.final_code && (
+              <div className="card p-6 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-landing-primary">Your Submitted Code</h3>
+                  <span className="badge badge-neutral">
+                    {evaluation.interview.language}
+                  </span>
+                </div>
+                <pre className="bg-landing-primary/5 rounded-lg p-4 overflow-x-auto text-sm text-landing-secondary">
+                  <code>{evaluation.interview.final_code}</code>
+                </pre>
+              </div>
+            )}
+
+            {/* Notes - Only for system design */}
+            {isSystemDesign && (evaluation.evaluated_notes || evaluation.interview?.notes) && (
+              <div className="card p-6 mb-8">
+                <h3 className="text-lg font-semibold text-landing-primary mb-4">Your Notes</h3>
+                <pre className="bg-landing-primary/5 rounded-lg p-4 overflow-x-auto text-sm text-landing-secondary whitespace-pre-wrap font-mono">
+                  {evaluation.evaluated_notes || evaluation.interview?.notes}
+                </pre>
+              </div>
+            )}
       </div>
     </div>
   )
@@ -456,11 +457,11 @@ function RatingBadge({ rating }: {
   }
 
   const colors: Record<string, string> = {
-    strong: 'bg-lc-green text-white',
-    comprehensive: 'bg-lc-green text-white',
-    adequate: 'bg-lc-yellow text-black',
-    needs_improvement: 'bg-lc-red text-white',
-    incomplete: 'bg-lc-red text-white',
+    strong: 'bg-green-500 text-white',
+    comprehensive: 'bg-green-500 text-white',
+    adequate: 'bg-amber-500 text-white',
+    needs_improvement: 'bg-red-500 text-white',
+    incomplete: 'bg-red-500 text-white',
   }
 
   return (
@@ -473,9 +474,9 @@ function RatingBadge({ rating }: {
 // Importance badge for completeness gaps
 function ImportanceBadge({ importance }: { importance: 'critical' | 'important' | 'minor' }) {
   const colors: Record<string, string> = {
-    critical: 'bg-lc-red/20 text-lc-red border-lc-red/30',
-    important: 'bg-lc-yellow/20 text-lc-yellow border-lc-yellow/30',
-    minor: 'bg-lc-text-muted/20 text-lc-text-muted border-lc-text-muted/30',
+    critical: 'bg-red-100 text-red-700 border-red-200',
+    important: 'bg-amber-100 text-amber-700 border-amber-200',
+    minor: 'bg-gray-100 text-gray-600 border-gray-200',
   }
 
   return (
@@ -496,36 +497,36 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
       <>
         {/* Overall Summary */}
         {feedback.summary && (
-          <div className="mb-8 p-6 rounded-lg bg-lc-bg-layer-1 border border-lc-border">
-            <h3 className="text-lg font-semibold mb-3 text-lc-text-primary">Summary</h3>
-            <p className="text-lc-text-secondary leading-relaxed whitespace-pre-wrap">{feedback.summary}</p>
+          <div className="mb-8 p-6 rounded-lg bg-white border border-black/10">
+            <h3 className="text-lg font-semibold mb-3 text-landing-primary">Summary</h3>
+            <p className="text-landing-secondary leading-relaxed whitespace-pre-wrap">{feedback.summary}</p>
           </div>
         )}
 
         {/* Style and Completeness Rating Cards */}
         <div className="grid grid-cols-2 gap-6 mb-8">
           {/* Style Rating Card */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
+          <div className="bg-white rounded-lg p-6 border border-black/10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-lc-text-primary">Style</h3>
+              <h3 className="text-lg font-semibold text-landing-primary">Style</h3>
               {feedback.style?.rating && (
                 <RatingBadge rating={feedback.style.rating} />
               )}
             </div>
-            <p className="text-sm text-lc-text-muted mb-2">
+            <p className="text-sm text-landing-muted mb-2">
               How you approached the problem: clarity of thought, structure, diagrams, trade-off consideration
             </p>
           </div>
 
           {/* Completeness Rating Card */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
+          <div className="bg-white rounded-lg p-6 border border-black/10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-lc-text-primary">Completeness</h3>
+              <h3 className="text-lg font-semibold text-landing-primary">Completeness</h3>
               {feedback.completeness?.rating && (
                 <RatingBadge rating={feedback.completeness.rating} />
               )}
             </div>
-            <p className="text-sm text-lc-text-muted mb-2">
+            <p className="text-sm text-landing-muted mb-2">
               What you covered compared to the answer key: features, depth, critical components
             </p>
           </div>
@@ -533,22 +534,22 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
         {/* STYLE SECTION */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4 text-lc-text-primary flex items-center gap-2">
-            <span className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white text-sm">1</span>
+          <h2 className="text-xl font-bold mb-4 text-landing-primary flex items-center gap-2">
+            <span className="w-8 h-8 rounded-full bg-accent-purple flex items-center justify-center text-white text-sm">1</span>
             Style Assessment
           </h2>
 
           {/* Style Assessment Text */}
           {feedback.style?.assessment && (
-            <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-6 border border-lc-border">
-              <p className="text-lc-text-secondary leading-relaxed whitespace-pre-wrap">{feedback.style.assessment}</p>
+            <div className="bg-white rounded-lg p-6 mb-6 border border-black/10">
+              <p className="text-landing-secondary leading-relaxed whitespace-pre-wrap">{feedback.style.assessment}</p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-6">
             {/* Style Strengths */}
-            <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-              <h4 className="text-lg font-semibold text-lc-green mb-4 flex items-center gap-2">
+            <div className="bg-white rounded-lg p-6 border border-black/10">
+              <h4 className="text-lg font-semibold text-green-600 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
@@ -557,22 +558,22 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
               {feedback.style?.strengths && feedback.style.strengths.length > 0 ? (
                 <div className="space-y-4">
                   {feedback.style.strengths.map((item, index) => (
-                    <div key={index} className="border-l-2 border-lc-green pl-4">
-                      <p className="text-lc-text-primary font-medium">{item.point}</p>
+                    <div key={index} className="border-l-2 border-green-500 pl-4">
+                      <p className="text-landing-primary font-medium">{item.point}</p>
                       {item.example && (
-                        <p className="text-sm text-lc-text-muted mt-1 italic">"{item.example}"</p>
+                        <p className="text-sm text-landing-muted mt-1 italic">"{item.example}"</p>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-lc-text-muted">No specific strengths identified</p>
+                <p className="text-landing-muted">No specific strengths identified</p>
               )}
             </div>
 
             {/* Style Improvements */}
-            <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-              <h4 className="text-lg font-semibold text-lc-yellow mb-4 flex items-center gap-2">
+            <div className="bg-white rounded-lg p-6 border border-black/10">
+              <h4 className="text-lg font-semibold text-amber-600 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -581,15 +582,15 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
               {feedback.style?.improvements && feedback.style.improvements.length > 0 ? (
                 <div className="space-y-4">
                   {feedback.style.improvements.map((item, index) => (
-                    <div key={index} className="border-l-2 border-lc-yellow pl-4">
-                      <p className="text-lc-text-primary font-medium">{item.point}</p>
+                    <div key={index} className="border-l-2 border-amber-500 pl-4">
+                      <p className="text-landing-primary font-medium">{item.point}</p>
                       {item.what_they_did && (
-                        <p className="text-sm text-lc-red mt-1">
+                        <p className="text-sm text-red-600 mt-1">
                           <span className="font-medium">What you did:</span> {item.what_they_did}
                         </p>
                       )}
                       {item.what_would_be_better && (
-                        <p className="text-sm text-lc-green mt-1">
+                        <p className="text-sm text-green-600 mt-1">
                           <span className="font-medium">Better approach:</span> {item.what_would_be_better}
                         </p>
                       )}
@@ -597,7 +598,7 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                   ))}
                 </div>
               ) : (
-                <p className="text-lc-text-muted">No improvements identified</p>
+                <p className="text-landing-muted">No improvements identified</p>
               )}
             </div>
           </div>
@@ -605,22 +606,22 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
         {/* COMPLETENESS SECTION */}
         <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4 text-lc-text-primary flex items-center gap-2">
-            <span className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white text-sm">2</span>
+          <h2 className="text-xl font-bold mb-4 text-landing-primary flex items-center gap-2">
+            <span className="w-8 h-8 rounded-full bg-accent-purple flex items-center justify-center text-white text-sm">2</span>
             Completeness Assessment
           </h2>
 
           {/* Completeness Assessment Text */}
           {feedback.completeness?.assessment && (
-            <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-6 border border-lc-border">
-              <p className="text-lc-text-secondary leading-relaxed whitespace-pre-wrap">{feedback.completeness.assessment}</p>
+            <div className="bg-white rounded-lg p-6 mb-6 border border-black/10">
+              <p className="text-landing-secondary leading-relaxed whitespace-pre-wrap">{feedback.completeness.assessment}</p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-6">
             {/* Topics Covered Well */}
-            <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-              <h4 className="text-lg font-semibold text-lc-green mb-4 flex items-center gap-2">
+            <div className="bg-white rounded-lg p-6 border border-black/10">
+              <h4 className="text-lg font-semibold text-green-600 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -629,22 +630,22 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
               {feedback.completeness?.covered_well && feedback.completeness.covered_well.length > 0 ? (
                 <div className="space-y-3">
                   {feedback.completeness.covered_well.map((item, index) => (
-                    <div key={index} className="border-l-2 border-lc-green pl-4">
-                      <p className="text-lc-text-primary font-medium">{item.topic}</p>
+                    <div key={index} className="border-l-2 border-green-500 pl-4">
+                      <p className="text-landing-primary font-medium">{item.topic}</p>
                       {item.detail && (
-                        <p className="text-sm text-lc-text-muted mt-1">{item.detail}</p>
+                        <p className="text-sm text-landing-muted mt-1">{item.detail}</p>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-lc-text-muted">No topics specifically highlighted</p>
+                <p className="text-landing-muted">No topics specifically highlighted</p>
               )}
             </div>
 
             {/* Brief Gaps Summary */}
-            <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-              <h4 className="text-lg font-semibold text-lc-red mb-4 flex items-center gap-2">
+            <div className="bg-white rounded-lg p-6 border border-black/10">
+              <h4 className="text-lg font-semibold text-red-600 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -655,39 +656,38 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                   {feedback.completeness.gaps.map((item, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <ImportanceBadge importance={item.importance} />
-                      <span className="text-lc-text-secondary">{item.topic}</span>
+                      <span className="text-landing-secondary">{item.topic}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-lc-text-muted">No significant gaps identified</p>
+                <p className="text-landing-muted">No significant gaps identified</p>
               )}
               {feedback.completeness?.gaps && feedback.completeness.gaps.length > 0 && (
-                <p className="text-xs text-lc-text-muted mt-4">See detailed breakdown below</p>
+                <p className="text-xs text-landing-muted mt-4">See detailed breakdown below</p>
               )}
             </div>
           </div>
         </div>
 
-        {/* DETAILED MISSED COMPONENTS SECTION - Full Width, Very Prominent */}
+        {/* DETAILED MISSED COMPONENTS SECTION */}
         {feedback.completeness?.gaps && feedback.completeness.gaps.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-bold mb-4 text-lc-red flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-lc-red flex items-center justify-center text-white text-sm">!</span>
+            <h2 className="text-xl font-bold mb-4 text-red-600 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-sm">!</span>
               What You Missed (Detailed Breakdown)
             </h2>
-            <p className="text-lc-text-muted mb-6">
-              Below is a detailed comparison of what you said vs what a strong candidate would cover. Study these gaps carefully.
+            <p className="text-landing-muted mb-6">
+              Below is a detailed comparison of what you said vs what a strong candidate would cover.
             </p>
 
             <div className="space-y-6">
               {feedback.completeness.gaps.map((gap, index) => (
-                <div key={index} className="bg-lc-bg-layer-1 rounded-lg border border-lc-red/30 overflow-hidden">
-                  {/* Gap Header */}
-                  <div className="bg-lc-red/10 px-6 py-4 border-b border-lc-red/20">
+                <div key={index} className="bg-white rounded-lg border border-red-200 overflow-hidden">
+                  <div className="bg-red-50 px-6 py-4 border-b border-red-100">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-semibold text-lc-text-primary flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-lc-red text-white flex items-center justify-center text-sm">
+                      <h4 className="text-lg font-semibold text-landing-primary flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-sm">
                           {index + 1}
                         </span>
                         {gap.topic}
@@ -695,50 +695,31 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                       <ImportanceBadge importance={gap.importance} />
                     </div>
                     {gap.what_was_missing && (
-                      <p className="text-sm text-lc-text-muted mt-2">{gap.what_was_missing}</p>
+                      <p className="text-sm text-landing-muted mt-2">{gap.what_was_missing}</p>
                     )}
                   </div>
 
-                  {/* Gap Details */}
                   <div className="p-6 space-y-4">
-                    {/* What You Said */}
-                    <div className="bg-lc-red/5 rounded-lg p-4 border border-lc-red/20">
-                      <h5 className="text-sm font-semibold text-lc-red mb-2 flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        What You Said
-                      </h5>
-                      <p className="text-lc-text-secondary italic">
+                    <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                      <h5 className="text-sm font-semibold text-red-700 mb-2">What You Said</h5>
+                      <p className="text-landing-secondary italic">
                         {gap.what_candidate_said || 'Not mentioned'}
                       </p>
                     </div>
 
-                    {/* What Answer Key Says */}
                     {gap.answer_key_excerpt && (
-                      <div className="bg-lc-teal/5 rounded-lg p-4 border border-lc-teal/20">
-                        <h5 className="text-sm font-semibold text-lc-teal mb-2 flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          From the Answer Key
-                        </h5>
-                        <p className="text-lc-text-secondary whitespace-pre-wrap text-sm leading-relaxed">
+                      <div className="bg-teal-50 rounded-lg p-4 border border-teal-100">
+                        <h5 className="text-sm font-semibold text-teal-700 mb-2">From the Answer Key</h5>
+                        <p className="text-landing-secondary whitespace-pre-wrap text-sm leading-relaxed">
                           {gap.answer_key_excerpt}
                         </p>
                       </div>
                     )}
 
-                    {/* Example Good Response */}
                     {gap.example_good_response && (
-                      <div className="bg-lc-green/5 rounded-lg p-4 border border-lc-green/20">
-                        <h5 className="text-sm font-semibold text-lc-green mb-2 flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          What a Strong Candidate Would Say
-                        </h5>
-                        <p className="text-lc-text-secondary italic leading-relaxed">
+                      <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                        <h5 className="text-sm font-semibold text-green-700 mb-2">What a Strong Candidate Would Say</h5>
+                        <p className="text-landing-secondary italic leading-relaxed">
                           "{gap.example_good_response}"
                         </p>
                       </div>
@@ -753,24 +734,19 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
         {/* RECOMMENDATIONS SECTION */}
         {feedback.recommendations && feedback.recommendations.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-bold mb-4 text-lc-text-primary flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white text-sm">3</span>
+            <h2 className="text-xl font-bold mb-4 text-landing-primary flex items-center gap-2">
+              <span className="w-8 h-8 rounded-full bg-accent-purple flex items-center justify-center text-white text-sm">3</span>
               Key Recommendations
             </h2>
             <div className="space-y-4">
               {feedback.recommendations.map((rec, index) => (
-                <div key={index} className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-                  <h4 className="text-lg font-semibold text-brand-orange mb-2 flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    {rec.title}
-                  </h4>
-                  <p className="text-lc-text-secondary leading-relaxed">{rec.explanation}</p>
+                <div key={index} className="bg-white rounded-lg p-6 border border-black/10">
+                  <h4 className="text-lg font-semibold text-accent-purple mb-2">{rec.title}</h4>
+                  <p className="text-landing-secondary leading-relaxed">{rec.explanation}</p>
                   {rec.example && (
-                    <div className="mt-3 p-3 bg-lc-bg-dark rounded-lg">
-                      <p className="text-sm text-lc-text-muted">
-                        <span className="font-medium text-lc-teal">Example:</span> {rec.example}
+                    <div className="mt-3 p-3 bg-warm-section rounded-lg">
+                      <p className="text-sm text-landing-muted">
+                        <span className="font-medium text-teal-600">Example:</span> {rec.example}
                       </p>
                     </div>
                   )}
@@ -783,8 +759,7 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
     )
   }
 
-  // LEGACY FALLBACK: Old feedback structure - FEEDBACK FOCUSED LAYOUT
-  // Helper to get detailed notes that actually have content
+  // LEGACY FALLBACK
   const detailedNotesWithContent = feedback && isSystemDesignFeedback(feedback) && feedback.detailed_notes
     ? [
         { key: 'requirements', label: 'Requirements Gathering', note: feedback.detailed_notes.requirements },
@@ -799,54 +774,43 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
   return (
     <>
-      {/* KEY TAKEAWAY - Most prominent at top */}
+      {/* KEY TAKEAWAY */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.key_takeaway && (
-        <div className="bg-brand-orange/10 border border-brand-orange rounded-xl p-6 mb-8">
-          <h3 className="text-lg font-semibold text-brand-orange mb-2 flex items-center gap-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Key Takeaway
-          </h3>
-          <p className="text-lc-text-primary text-lg leading-relaxed">{feedback.key_takeaway}</p>
+        <div className="bg-accent-purple/10 border border-accent-purple rounded-xl p-6 mb-8">
+          <h3 className="text-lg font-semibold text-accent-purple mb-2">Key Takeaway</h3>
+          <p className="text-landing-primary text-lg leading-relaxed">{feedback.key_takeaway}</p>
         </div>
       )}
 
-      {/* Summary if no key takeaway */}
+      {/* Summary */}
       {feedback?.summary && !(feedback && isSystemDesignFeedback(feedback) && feedback.key_takeaway) && (
-        <div className="bg-lc-bg-layer-1 border border-lc-border rounded-xl p-6 mb-8">
-          <h3 className="text-lg font-semibold text-lc-text-primary mb-2">Summary</h3>
-          <p className="text-lc-text-secondary leading-relaxed">{feedback.summary}</p>
+        <div className="bg-white border border-black/10 rounded-xl p-6 mb-8">
+          <h3 className="text-lg font-semibold text-landing-primary mb-2">Summary</h3>
+          <p className="text-landing-secondary leading-relaxed">{feedback.summary}</p>
         </div>
       )}
 
-      {/* OVERALL SCORE - Compact inline display */}
-      <div className="flex items-center gap-4 mb-8 p-4 bg-lc-bg-layer-1 rounded-lg border border-lc-border">
+      {/* OVERALL SCORE */}
+      <div className="flex items-center gap-4 mb-8 p-4 bg-white rounded-lg border border-black/10">
         <div className={`text-3xl font-bold ${
-          (evaluation.overall_score || 0) >= 70 ? 'text-lc-green' :
-          (evaluation.overall_score || 0) >= 50 ? 'text-lc-yellow' : 'text-lc-red'
+          (evaluation.overall_score || 0) >= 70 ? 'text-green-600' :
+          (evaluation.overall_score || 0) >= 50 ? 'text-amber-600' : 'text-red-600'
         }`}>
           {evaluation.overall_score}/100
         </div>
-        <div className="text-lc-text-muted">Overall Score</div>
+        <div className="text-landing-muted">Overall Score</div>
       </div>
 
-      {/* FEEDBACK SECTIONS - Primary focus */}
+      {/* FEEDBACK SECTIONS */}
       {feedback && isSystemDesignFeedback(feedback) && (feedback.good_points || feedback.areas_for_improvement) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* What You Did Well */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-green mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              What You Did Well
-            </h3>
+          <div className="bg-white rounded-lg p-6 border border-black/10">
+            <h3 className="text-lg font-semibold text-green-600 mb-4">What You Did Well</h3>
             {feedback.good_points && feedback.good_points.length > 0 ? (
               <ul className="space-y-3">
                 {feedback.good_points.map((point, index) => (
-                  <li key={index} className="flex items-start gap-3 text-lc-text-secondary">
-                    <span className="w-6 h-6 rounded-full bg-lc-green/20 text-lc-green flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                  <li key={index} className="flex items-start gap-3 text-landing-secondary">
+                    <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                       {index + 1}
                     </span>
                     <span className="leading-relaxed">{point}</span>
@@ -854,23 +818,17 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted italic">No specific strengths identified</p>
+              <p className="text-landing-muted italic">No specific strengths identified</p>
             )}
           </div>
 
-          {/* Areas for Improvement */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-yellow mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Areas for Improvement
-            </h3>
+          <div className="bg-white rounded-lg p-6 border border-black/10">
+            <h3 className="text-lg font-semibold text-amber-600 mb-4">Areas for Improvement</h3>
             {feedback.areas_for_improvement && feedback.areas_for_improvement.length > 0 ? (
               <ul className="space-y-3">
                 {feedback.areas_for_improvement.map((area, index) => (
-                  <li key={index} className="flex items-start gap-3 text-lc-text-secondary">
-                    <span className="w-6 h-6 rounded-full bg-lc-yellow/20 text-lc-yellow flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                  <li key={index} className="flex items-start gap-3 text-landing-secondary">
+                    <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                       {index + 1}
                     </span>
                     <span className="leading-relaxed">{area}</span>
@@ -878,26 +836,21 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted italic">No specific improvements identified</p>
+              <p className="text-landing-muted italic">No specific improvements identified</p>
             )}
           </div>
         </div>
       )}
 
-      {/* DETAILED FEEDBACK - Only show categories with actual content */}
+      {/* DETAILED FEEDBACK */}
       {detailedNotesWithContent.length > 0 && (
-        <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-          <h3 className="text-lg font-semibold text-lc-text-primary mb-6 flex items-center gap-2">
-            <svg className="w-5 h-5 text-brand-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Detailed Feedback
-          </h3>
+        <div className="bg-white rounded-lg p-6 mb-8 border border-black/10">
+          <h3 className="text-lg font-semibold text-landing-primary mb-6">Detailed Feedback</h3>
           <div className="space-y-6">
             {detailedNotesWithContent.map(({ key, label, note }) => (
-              <div key={key} className="border-l-3 border-brand-orange pl-4 py-1">
-                <h4 className="text-sm font-semibold text-brand-orange mb-2 uppercase tracking-wide">{label}</h4>
-                <p className="text-lc-text-secondary leading-relaxed">{note}</p>
+              <div key={key} className="border-l-3 border-accent-purple pl-4 py-1">
+                <h4 className="text-sm font-semibold text-accent-purple mb-2 uppercase tracking-wide">{label}</h4>
+                <p className="text-landing-secondary leading-relaxed">{note}</p>
               </div>
             ))}
           </div>
@@ -906,17 +859,12 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
       {/* MISSED COMPONENTS */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.missed_components && feedback.missed_components.length > 0 && (
-        <div className="bg-lc-red/5 rounded-lg p-6 mb-8 border border-lc-red/20">
-          <h3 className="text-lg font-semibold text-lc-red mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Components You Missed
-          </h3>
+        <div className="bg-red-50 rounded-lg p-6 mb-8 border border-red-200">
+          <h3 className="text-lg font-semibold text-red-700 mb-4">Components You Missed</h3>
           <ul className="space-y-2">
             {feedback.missed_components.map((component, index) => (
-              <li key={index} className="flex items-start gap-3 text-lc-text-secondary">
-                <svg className="w-5 h-5 text-lc-red flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <li key={index} className="flex items-start gap-3 text-landing-secondary">
+                <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 {component}
@@ -928,17 +876,12 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
 
       {/* STUDY RECOMMENDATIONS */}
       {feedback && isSystemDesignFeedback(feedback) && feedback.study_recommendations && feedback.study_recommendations.length > 0 && (
-        <div className="bg-lc-teal/5 rounded-lg p-6 mb-8 border border-lc-teal/20">
-          <h3 className="text-lg font-semibold text-lc-teal mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            What to Study Next
-          </h3>
+        <div className="bg-teal-50 rounded-lg p-6 mb-8 border border-teal-200">
+          <h3 className="text-lg font-semibold text-teal-700 mb-4">What to Study Next</h3>
           <ul className="space-y-2">
             {feedback.study_recommendations.map((rec, index) => (
-              <li key={index} className="flex items-start gap-3 text-lc-text-secondary">
-                <span className="w-6 h-6 rounded-full bg-lc-teal/20 text-lc-teal flex items-center justify-center text-xs font-semibold flex-shrink-0">
+              <li key={index} className="flex items-start gap-3 text-landing-secondary">
+                <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                   {index + 1}
                 </span>
                 <span className="leading-relaxed">{rec}</span>
@@ -948,15 +891,12 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
         </div>
       )}
 
-      {/* SCORE BREAKDOWN - Collapsible / Secondary at bottom */}
-      <details className="bg-lc-bg-layer-1 rounded-lg border border-lc-border mb-8">
-        <summary className="p-4 cursor-pointer text-lc-text-secondary hover:text-lc-text-primary flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
+      {/* SCORE BREAKDOWN */}
+      <details className="bg-white rounded-lg border border-black/10 mb-8">
+        <summary className="p-4 cursor-pointer text-landing-secondary hover:text-landing-primary flex items-center gap-2">
           <span className="font-medium">View Detailed Score Breakdown</span>
         </summary>
-        <div className="p-6 pt-2 border-t border-lc-border">
+        <div className="p-6 pt-2 border-t border-black/10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               { label: 'Requirements Gathering', score: evaluation.requirements_gathering_score },
@@ -968,21 +908,17 @@ function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationD
               { label: 'Communication', score: evaluation.communication_score },
             ].map(({ label, score }) => (
               <div key={label} className="flex items-center justify-between">
-                <span className="text-lc-text-muted text-sm">{label}</span>
+                <span className="text-landing-muted text-sm">{label}</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-20 h-2 bg-lc-bg-dark rounded-full overflow-hidden">
+                  <div className="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
-                        (score || 0) >= 70
-                          ? 'bg-lc-green'
-                          : (score || 0) >= 50
-                          ? 'bg-lc-yellow'
-                          : 'bg-lc-red'
+                        (score || 0) >= 70 ? 'bg-green-500' : (score || 0) >= 50 ? 'bg-amber-500' : 'bg-red-500'
                       }`}
                       style={{ width: `${score || 0}%` }}
                     />
                   </div>
-                  <span className="text-sm text-lc-text-secondary w-8 text-right">{score || 0}</span>
+                  <span className="text-sm text-landing-secondary w-8 text-right">{score || 0}</span>
                 </div>
               </div>
             ))}
@@ -1002,26 +938,20 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
       {/* Overall Result */}
       <div
         className={`mb-8 p-6 rounded-xl text-center ${
-          evaluation.verdict === 'PASS'
-            ? 'bg-lc-green/10 border border-lc-green'
-            : 'bg-lc-red/10 border border-lc-red'
+          evaluation.verdict === 'PASS' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
         }`}
       >
-        <div
-          className={`text-4xl font-bold mb-2 ${
-            evaluation.verdict === 'PASS' ? 'text-lc-green' : 'text-lc-red'
-          }`}
-        >
+        <div className={`text-4xl font-bold mb-2 ${evaluation.verdict === 'PASS' ? 'text-green-600' : 'text-red-600'}`}>
           {evaluation.verdict === 'PASS' ? 'PASSED' : 'NEEDS IMPROVEMENT'}
         </div>
-        <div className="text-lg text-lc-text-secondary">
+        <div className="text-lg text-landing-secondary">
           Overall Score: {evaluation.overall_score}/100
         </div>
       </div>
 
       {/* Score Breakdown */}
-      <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-        <h3 className="text-lg font-semibold text-lc-text-primary mb-4">Score Breakdown</h3>
+      <div className="bg-white rounded-lg p-6 mb-8 border border-black/10">
+        <h3 className="text-lg font-semibold text-landing-primary mb-4">Score Breakdown</h3>
         <div className="grid grid-cols-2 gap-4">
           {[
             { label: 'Test Case Coverage', score: evaluation.test_case_coverage_score, description: 'How many test cases passed' },
@@ -1032,25 +962,19 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
             { label: 'Complexity Analysis', score: evaluation.complexity_analysis_score, description: 'Big O time/space discussion' },
             { label: 'Code Quality', score: evaluation.code_quality_score, description: 'Clean, readable code' },
           ].map(({ label, score, description }) => (
-            <div key={label} className="flex items-center justify-between group relative">
+            <div key={label} className="flex items-center justify-between">
               <div>
-                <span className="text-lc-text-secondary">{label}</span>
-                <p className="text-xs text-lc-text-muted">{description}</p>
+                <span className="text-landing-secondary">{label}</span>
+                <p className="text-xs text-landing-muted">{description}</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="progress-bar w-24">
                   <div
-                    className={`h-full rounded-full ${
-                      (score || 0) >= 70
-                        ? 'bg-lc-green'
-                        : (score || 0) >= 50
-                        ? 'bg-lc-yellow'
-                        : 'bg-lc-red'
-                    }`}
+                    className={`h-full rounded-full ${(score || 0) >= 70 ? 'bg-green-500' : (score || 0) >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
                     style={{ width: `${score || 0}%` }}
                   />
                 </div>
-                <span className="text-sm text-lc-text-secondary w-8 text-right">{score || 0}</span>
+                <span className="text-sm text-landing-secondary w-8 text-right">{score || 0}</span>
               </div>
             </div>
           ))}
@@ -1060,14 +984,13 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
       {/* Feedback */}
       {feedback && !isSystemDesignFeedback(feedback) && (
         <div className="grid grid-cols-2 gap-6 mb-8">
-          {/* Strengths */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-green mb-4">Strengths</h3>
+          <div className="bg-white rounded-lg p-6 border border-black/10">
+            <h3 className="text-lg font-semibold text-green-600 mb-4">Strengths</h3>
             {feedback.strengths.length > 0 ? (
               <ul className="space-y-2">
                 {feedback.strengths.map((strength, index) => (
-                  <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
-                    <svg className="w-5 h-5 text-lc-green flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <li key={index} className="flex items-start gap-2 text-landing-secondary">
+                    <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     {strength}
@@ -1075,18 +998,17 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted">No strengths identified</p>
+              <p className="text-landing-muted">No strengths identified</p>
             )}
           </div>
 
-          {/* Areas for Improvement */}
-          <div className="bg-lc-bg-layer-1 rounded-lg p-6 border border-lc-border">
-            <h3 className="text-lg font-semibold text-lc-yellow mb-4">Areas for Improvement</h3>
+          <div className="bg-white rounded-lg p-6 border border-black/10">
+            <h3 className="text-lg font-semibold text-amber-600 mb-4">Areas for Improvement</h3>
             {feedback.improvements.length > 0 ? (
               <ul className="space-y-2">
                 {feedback.improvements.map((improvement, index) => (
-                  <li key={index} className="flex items-start gap-2 text-lc-text-secondary">
-                    <svg className="w-5 h-5 text-lc-yellow flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <li key={index} className="flex items-start gap-2 text-landing-secondary">
+                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     {improvement}
@@ -1094,7 +1016,7 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
                 ))}
               </ul>
             ) : (
-              <p className="text-lc-text-muted">No improvements identified</p>
+              <p className="text-landing-muted">No improvements identified</p>
             )}
           </div>
         </div>
@@ -1102,11 +1024,9 @@ function CodingEvaluationDisplay({ evaluation }: { evaluation: EvaluationData })
 
       {/* Detailed Notes */}
       {feedback && !isSystemDesignFeedback(feedback) && feedback.detailed_notes && (
-        <div className="bg-lc-bg-layer-1 rounded-lg p-6 mb-8 border border-lc-border">
-          <h3 className="text-lg font-semibold text-lc-text-primary mb-4">Detailed Feedback</h3>
-          <p className="text-lc-text-secondary whitespace-pre-wrap">
-            {feedback.detailed_notes}
-          </p>
+        <div className="bg-white rounded-lg p-6 mb-8 border border-black/10">
+          <h3 className="text-lg font-semibold text-landing-primary mb-4">Detailed Feedback</h3>
+          <p className="text-landing-secondary whitespace-pre-wrap">{feedback.detailed_notes}</p>
         </div>
       )}
     </>

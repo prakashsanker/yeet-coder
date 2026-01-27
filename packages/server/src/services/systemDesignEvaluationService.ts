@@ -339,7 +339,7 @@ export async function evaluateSystemDesignInterview(
   input: SystemDesignEvaluationInput,
   options: { model?: LLMModel } = {}
 ): Promise<SystemDesignEvaluationResult> {
-  const { model = 'anthropic/claude-sonnet-4' } = options
+  const { model = 'anthropic/claude-opus-4.5' } = options
 
   const diagramSummary = summarizeDiagram(input.drawingData?.elements)
   const referenceSolutionText = formatReferenceSolutions(input.referenceSolutions)

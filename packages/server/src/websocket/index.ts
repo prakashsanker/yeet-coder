@@ -17,6 +17,13 @@ const VOICE_MODE: VoiceMode = (process.env.VOICE_MODE as VoiceMode) || 'pipeline
 
 console.log(`[WebSocket] Voice mode: ${VOICE_MODE}`)
 
+export interface TranscriptEntry {
+  timestamp: number
+  speaker: 'user' | 'interviewer'
+  text: string
+  estimatedTokens?: number
+}
+
 export interface InterviewWebSocket extends WebSocket {
   interviewId?: string
   voiceSession?: VoiceSession // Traditional pipeline session
@@ -26,6 +33,10 @@ export interface InterviewWebSocket extends WebSocket {
     currentQuestion: string
     userCode: string
   }
+  // Store the introduction that was given so the conversation session knows the context
+  introductionGiven?: string
+  // Conversation history for context continuity
+  conversationHistory?: TranscriptEntry[]
 }
 
 export type WebSocketMessage =
@@ -148,4 +159,52 @@ export function sendMessage(ws: WebSocket, message: WebSocketResponse): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(message))
   }
+}
+
+/**
+ * Add a message to the conversation history
+ */
+export function addToConversationHistory(
+  ws: InterviewWebSocket,
+  speaker: 'user' | 'interviewer',
+  text: string
+): void {
+  if (!ws.conversationHistory) {
+    ws.conversationHistory = []
+  }
+
+  // Estimate tokens: ~1.3 tokens per word for conversational text
+  const words = text.split(/\s+/).filter(w => w.length > 0)
+  const estimatedTokens = Math.ceil(words.length * 1.3)
+
+  ws.conversationHistory.push({
+    timestamp: Date.now(),
+    speaker,
+    text,
+    estimatedTokens,
+  })
+
+  // Calculate total tokens for logging
+  const totalTokens = ws.conversationHistory.reduce((sum, e) => sum + (e.estimatedTokens || 0), 0)
+  console.log(`[WebSocket] Added to history: ${speaker} said "${text.substring(0, 50)}..." (${estimatedTokens} tokens, total: ${totalTokens})`)
+}
+
+/**
+ * Get a summarized version of the conversation history for context
+ * Used to include in Realtime API instructions when context is long
+ */
+export function getConversationSummary(ws: InterviewWebSocket, maxEntries = 10): string {
+  if (!ws.conversationHistory || ws.conversationHistory.length === 0) {
+    return ''
+  }
+
+  // Take the most recent entries
+  const recentHistory = ws.conversationHistory.slice(-maxEntries)
+
+  // Format as a simple transcript
+  const transcript = recentHistory
+    .map((entry) => `${entry.speaker === 'user' ? 'Candidate' : 'Interviewer'}: ${entry.text}`)
+    .join('\n')
+
+  return transcript
 }
