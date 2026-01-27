@@ -4,7 +4,7 @@ import { supabase } from '../db/supabase.js'
 import { optionalAuthMiddleware, AuthenticatedRequest } from '../middleware/auth.js'
 import { evaluationService, type EvaluationInput } from '../services/evaluationService.js'
 import { systemDesignEvaluationService, type SystemDesignEvaluationInput } from '../services/systemDesignEvaluationService.js'
-import type { Evaluation, TestCase, TranscriptEntry, Question, ExcalidrawData } from '../types/index.js'
+import type { Evaluation, TestCase, TranscriptEntry, Question, ExcalidrawData, SystemDesignReferenceSolutions } from '../types/index.js'
 
 const router = Router()
 
@@ -83,6 +83,7 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
       visible_test_cases?: TestCase[]
       hidden_test_cases?: TestCase[]
       key_considerations?: string[]
+      reference_solutions?: SystemDesignReferenceSolutions
     } | null
 
     // Branch based on session type
@@ -103,6 +104,7 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
         questionDescription: question?.description || '',
         questionDifficulty: (question?.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
         keyConsiderations: metadata?.key_considerations || [],
+        referenceSolutions: metadata?.reference_solutions,  // Pass the answer key
         drawingData: interview.drawing_data as ExcalidrawData | null,
         notes: interview.notes as string | null,
         transcript: (interview.transcript || []) as TranscriptEntry[],
@@ -112,9 +114,16 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
 
       try {
         const sdResult = await systemDesignEvaluationService.evaluate(sdEvalInput)
-        console.log(`[EVALUATION] System design evaluation completed: ${sdResult.overall_score}/100`)
+        console.log(`[EVALUATION] System design evaluation completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}`)
 
         Object.assign(evaluationData, {
+          // New qualitative ratings
+          style_rating: sdResult.style_rating,
+          completeness_rating: sdResult.completeness_rating,
+          // Numeric scores (for backward compatibility)
+          clarity_score: sdResult.clarity_score,
+          structure_score: sdResult.structure_score,
+          correctness_score: sdResult.correctness_score,
           requirements_gathering_score: sdResult.requirements_gathering_score,
           system_components_score: sdResult.system_components_score,
           scalability_score: sdResult.scalability_score,

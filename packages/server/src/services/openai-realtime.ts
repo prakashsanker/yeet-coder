@@ -9,6 +9,11 @@
  */
 
 import WebSocket from 'ws'
+import {
+  getPersona,
+  buildLiveInterviewInstructions,
+  type InterviewType,
+} from './interviewerPersona.js'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
@@ -25,6 +30,11 @@ export interface RealtimeSessionConfig {
   inputAudioTranscription?: boolean
   turnDetection?: 'server_vad' | 'none'
   temperature?: number
+  // Interview context for persona
+  interviewType?: InterviewType
+  problemTitle?: string
+  problemDescription?: string
+  keyConsiderations?: string[]
 }
 
 export interface RealtimeEventHandlers {
@@ -39,26 +49,6 @@ export interface RealtimeEventHandlers {
   onClose?: () => void
 }
 
-// Default system instructions for the AI interviewer
-const DEFAULT_INTERVIEWER_INSTRUCTIONS = `You are an experienced technical interviewer at a top tech company conducting a coding interview.
-
-CRITICAL BEHAVIOR RULES:
-- Be CONCISE. Respond in 1-2 short sentences maximum.
-- Be more SILENT than talkative. Real interviewers mostly listen.
-- Only speak when you have something meaningful to add.
-- Do NOT proactively offer hints unless the candidate is clearly stuck and asks for help.
-- Do NOT ask multiple questions at once. Ask ONE question, then wait.
-- When the candidate is explaining their approach, often just say "Okay" or "Go on" or "Mm-hmm".
-- Do NOT repeat or summarize what the candidate just said.
-
-When to speak more:
-- When the candidate directly asks you a question
-- When the candidate is completely stuck and explicitly asks for help
-- When there's a critical error that would waste their time
-- When they've finished and you need to discuss complexity
-
-Remember: You're having a verbal conversation. Keep it natural and brief. Silence is okay.`
-
 /**
  * OpenAI Realtime API client for server-side WebSocket connections
  */
@@ -69,16 +59,32 @@ export class OpenAIRealtimeClient {
   private isConnected = false
   private currentQuestion = ''
   private currentCode = ''
+  private interviewType: InterviewType
 
   constructor(config: RealtimeSessionConfig = {}, handlers: RealtimeEventHandlers = {}) {
+    this.interviewType = config.interviewType || 'coding'
+
+    // Get persona-based instructions if no custom instructions provided
+    const persona = getPersona(this.interviewType)
+    const defaultInstructions = config.instructions || (
+      config.problemTitle
+        ? buildLiveInterviewInstructions(persona, {
+            title: config.problemTitle,
+            description: config.problemDescription || '',
+            keyConsiderations: config.keyConsiderations,
+          })
+        : persona.liveInterviewInstructions
+    )
+
     this.config = {
       model: 'gpt-4o-realtime-preview',
       voice: 'ash', // Good for interviews - clear, professional
-      instructions: DEFAULT_INTERVIEWER_INSTRUCTIONS,
       inputAudioTranscription: true,
       turnDetection: 'server_vad',
       temperature: 0.6,
       ...config,
+      // Use custom instructions if provided, otherwise use persona-based instructions
+      instructions: config.instructions || defaultInstructions,
     }
     this.handlers = handlers
   }
@@ -196,7 +202,9 @@ export class OpenAIRealtimeClient {
    * Build instructions including current problem context
    */
   private buildInstructions(): string {
-    let instructions = this.config.instructions || DEFAULT_INTERVIEWER_INSTRUCTIONS
+    // Use the config instructions which are already persona-based
+    const persona = getPersona(this.interviewType)
+    let instructions = this.config.instructions || persona.liveInterviewInstructions
 
     if (this.currentQuestion) {
       instructions += `\n\nCurrent coding problem:\n${this.currentQuestion}`
