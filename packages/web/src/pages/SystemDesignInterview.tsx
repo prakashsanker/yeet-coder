@@ -40,6 +40,9 @@ export default function SystemDesignInterview() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGivingUp, setIsGivingUp] = useState(false)
 
+  // Pause state
+  const [isPaused, setIsPaused] = useState(false)
+
   // Question panel state
   const [isQuestionExpanded, setIsQuestionExpanded] = useState(false)
 
@@ -138,9 +141,15 @@ export default function SystemDesignInterview() {
     loadInterview()
   }, [interviewIdParam, navigate])
 
-  // Timer tick
+  // Timer tick - stops when paused
   useEffect(() => {
-    if (!interview || interview.status !== 'in_progress') return
+    if (!interview || interview.status !== 'in_progress' || isPaused) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+      return
+    }
 
     timerRef.current = setInterval(() => {
       setTimeSpentMs(prev => prev + 1000)
@@ -149,7 +158,7 @@ export default function SystemDesignInterview() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [interview])
+  }, [interview, isPaused])
 
   // Auto-save every 10 seconds
   useEffect(() => {
@@ -320,6 +329,11 @@ export default function SystemDesignInterview() {
     }
   }
 
+  // Toggle pause
+  const handleTogglePause = useCallback(() => {
+    setIsPaused(prev => !prev)
+  }, [])
+
   // Format time for display
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000)
@@ -380,13 +394,26 @@ export default function SystemDesignInterview() {
       <AppHeader
         rightContent={
           <div className="flex items-center gap-4">
-            {/* Timer */}
+            {/* Timer with Pause */}
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className={`font-mono text-lg font-semibold ${remainingSeconds <= 300 ? 'text-[#C62828]' : 'text-[var(--text-primary)]'}`}>
+              <button
+                onClick={handleTogglePause}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                title={isPaused ? 'Resume' : 'Pause'}
+              >
+                {isPaused ? (
+                  <svg className="w-5 h-5 text-[#4CAF50]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-[var(--text-muted)]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                )}
+              </button>
+              <span className={`font-mono text-lg font-semibold ${isPaused ? 'text-amber-500' : remainingSeconds <= 300 ? 'text-[#C62828]' : 'text-[var(--text-primary)]'}`}>
                 {formatTime(timeSpentMs)} / {formatTime(timeLimitMs)}
+                {isPaused && <span className="ml-2 text-xs font-normal">(Paused)</span>}
               </span>
             </div>
             <button
@@ -474,18 +501,43 @@ export default function SystemDesignInterview() {
         </div>
       </div>
 
-      {/* Floating interviewer */}
-      <FloatingInterviewer
-        state={voiceState}
-        transcript={currentTranscript}
-        onStartListening={startListening}
-        onStopListening={stopListening}
-        hasIntroduced={hasIntroduced}
-        isAlwaysListening={isAlwaysListening}
-        isSpeechDetected={isSpeechDetected}
-        onEnableAlwaysListening={enableAlwaysListening}
-        onDisableAlwaysListening={disableAlwaysListening}
-      />
+      {/* Floating interviewer - hidden when paused */}
+      {!isPaused && (
+        <FloatingInterviewer
+          state={voiceState}
+          transcript={currentTranscript}
+          onStartListening={startListening}
+          onStopListening={stopListening}
+          hasIntroduced={hasIntroduced}
+          isAlwaysListening={isAlwaysListening}
+          isSpeechDetected={isSpeechDetected}
+          onEnableAlwaysListening={enableAlwaysListening}
+          onDisableAlwaysListening={disableAlwaysListening}
+        />
+      )}
+
+      {/* Pause overlay */}
+      {isPaused && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 text-center max-w-md shadow-2xl">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Interview Paused</h2>
+            <p className="text-[var(--text-muted)] mb-6">
+              Take a break. Your timer is paused and your progress is saved.
+            </p>
+            <button
+              onClick={handleTogglePause}
+              className="px-6 py-3 bg-[#4CAF50] hover:bg-[#388E3C] text-white rounded-lg font-medium transition-colors"
+            >
+              Resume Interview
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

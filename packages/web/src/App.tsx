@@ -12,7 +12,6 @@ import GeneratingEvaluation from './pages/GeneratingEvaluation'
 import Subscription from './pages/Subscription'
 import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
-import { analytics } from './lib/posthog'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -36,20 +35,34 @@ function AuthCallback() {
   const [isProcessing, setIsProcessing] = useState(true)
 
   useEffect(() => {
-    // Supabase handles the OAuth callback automatically via detectSessionInUrl
-    // We just need to wait for it to complete and then redirect
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        // Track user authentication
-        analytics.userAuthenticated(session.user.id, session.user.email)
-        setIsProcessing(false)
-      } else {
-        // Give it a moment to process the URL hash
-        setTimeout(() => setIsProcessing(false), 1000)
+    // Use onAuthStateChange to reliably detect when session is established
+    // This handles the race condition where getSession() might return null
+    // while Supabase is still processing the OAuth callback URL hash
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Session established - AuthContext will handle PostHog identify
+          setIsProcessing(false)
+        }
       }
+    )
+
+    // Also check if session already exists (in case event fired before listener was set up)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsProcessing(false)
+      }
+    })
+
+    // Timeout fallback after 5 seconds to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setIsProcessing(false)
+    }, 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
     }
-    checkSession()
   }, [])
 
   if (isProcessing) {

@@ -35,6 +35,8 @@ export interface RealtimeSessionConfig {
   problemTitle?: string
   problemDescription?: string
   keyConsiderations?: string[]
+  // Answer key for guiding the candidate toward important topics
+  answerKey?: string
   // Introduction that was already given (for context continuity)
   introductionGiven?: string
   // Conversation history context (may be compacted for long conversations)
@@ -76,6 +78,7 @@ export class OpenAIRealtimeClient {
             title: config.problemTitle,
             description: config.problemDescription || '',
             keyConsiderations: config.keyConsiderations,
+            answerKey: config.answerKey,
           })
         : persona.liveInterviewInstructions
     )
