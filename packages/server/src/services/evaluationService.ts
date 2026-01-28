@@ -150,27 +150,55 @@ export async function evaluateInterview(
   input: EvaluationInput,
   options: { model?: LLMModel } = {}
 ): Promise<EvaluationResult> {
-  const { model = 'llama-3.3-70b-versatile' } = options
+  // Helper function to create fallback evaluation
+  const createFallbackEvaluation = (passRate: number): EvaluationResult => {
+    const basicScore = Math.round(passRate)
+    return {
+      test_case_coverage_score: basicScore,
+      thought_process_score: 50,
+      clarifying_questions_score: 50,
+      edge_case_score: (input.userTestCases?.length || 0) > 0 ? 60 : 40,
+      time_management_score: 50,
+      complexity_analysis_score: 50,
+      code_quality_score: input.finalCode ? 60 : 30,
+      overall_score: basicScore,
+      verdict: basicScore >= 70 ? 'PASS' : 'FAIL',
+      feedback: {
+        strengths: passRate > 0 ? ['Some test cases passed'] : [],
+        improvements: ['Unable to generate detailed feedback'],
+        detailed_notes: 'Automatic evaluation based on test results only.',
+      },
+    }
+  }
 
-  const totalTests = input.testResults.visible.total + input.testResults.hidden.total
-  const totalPassed = input.testResults.visible.passed + input.testResults.hidden.passed
-  const passRate = totalTests > 0 ? (totalPassed / totalTests) * 100 : 0
+  try {
+    const { model = 'llama-3.3-70b-versatile' } = options
 
-  const userPrompt = `Evaluate this coding interview performance:
+    // Safely access test results with defaults
+    const testResults = input.testResults || { visible: { passed: 0, total: 0 }, hidden: { passed: 0, total: 0 } }
+    const totalTests = (testResults.visible?.total || 0) + (testResults.hidden?.total || 0)
+    const totalPassed = (testResults.visible?.passed || 0) + (testResults.hidden?.passed || 0)
+    const passRate = totalTests > 0 ? (totalPassed / totalTests) * 100 : 0
+
+    // Safely handle string inputs
+    const description = (input.questionDescription || '').slice(0, 500)
+    const constraints = Array.isArray(input.questionConstraints) ? input.questionConstraints.join(', ') : ''
+
+    const userPrompt = `Evaluate this coding interview performance:
 
 ## PROBLEM
-Title: ${input.questionTitle}
-Difficulty: ${input.questionDifficulty}
-Description: ${input.questionDescription.slice(0, 500)}...
-Constraints: ${input.questionConstraints.join(', ')}
+Title: ${input.questionTitle || 'Unknown'}
+Difficulty: ${input.questionDifficulty || 'medium'}
+Description: ${description}...
+Constraints: ${constraints}
 
 ## TEST RESULTS
-Visible Tests: ${input.testResults.visible.passed}/${input.testResults.visible.total} passed
-Hidden Tests: ${input.testResults.hidden.passed}/${input.testResults.hidden.total} passed
+Visible Tests: ${testResults.visible?.passed || 0}/${testResults.visible?.total || 0} passed
+Hidden Tests: ${testResults.hidden?.passed || 0}/${testResults.hidden?.total || 0} passed
 Overall Pass Rate: ${passRate.toFixed(1)}%
 
-## USER'S CODE (${input.language})
-\`\`\`${input.language}
+## USER'S CODE (${input.language || 'python'})
+\`\`\`${input.language || 'python'}
 ${input.finalCode || '(No code submitted)'}
 \`\`\`
 
@@ -181,14 +209,12 @@ ${formatUserTestCases(input.userTestCases)}
 ${formatTranscript(input.transcript)}
 
 ## TIME METRICS
-- Time spent: ${Math.floor(input.timeSpentSeconds / 60)}m ${input.timeSpentSeconds % 60}s
-- Time limit: ${Math.floor(input.timeLimitSeconds / 60)}m
-- Run attempts: ${input.runCount}
-- Submit attempts: ${input.submitCount}
+- Time spent: ${Math.floor((input.timeSpentSeconds || 0) / 60)}m ${(input.timeSpentSeconds || 0) % 60}s
+- Time limit: ${Math.floor((input.timeLimitSeconds || 3600) / 60)}m
+- Run attempts: ${input.runCount || 0}
+- Submit attempts: ${input.submitCount || 0}
 
 Based on all this information, provide a comprehensive evaluation.`
-
-  try {
     const result = await llm.generateJSON<EvaluationResult>(
       [
         { role: 'system', content: EVALUATION_SYSTEM_PROMPT },
@@ -219,25 +245,13 @@ Based on all this information, provide a comprehensive evaluation.`
   } catch (error) {
     console.error('[EVALUATION] Error generating evaluation:', error)
 
-    // Return a basic evaluation based on test results
-    const basicScore = Math.round(passRate)
+    // Calculate pass rate safely for fallback
+    const testResults = input.testResults || { visible: { passed: 0, total: 0 }, hidden: { passed: 0, total: 0 } }
+    const totalTests = (testResults.visible?.total || 0) + (testResults.hidden?.total || 0)
+    const totalPassed = (testResults.visible?.passed || 0) + (testResults.hidden?.passed || 0)
+    const passRate = totalTests > 0 ? (totalPassed / totalTests) * 100 : 0
 
-    return {
-      test_case_coverage_score: basicScore,
-      thought_process_score: 50,
-      clarifying_questions_score: 50,
-      edge_case_score: input.userTestCases.length > 0 ? 60 : 40,
-      time_management_score: 50,
-      complexity_analysis_score: 50,
-      code_quality_score: input.finalCode ? 60 : 30,
-      overall_score: basicScore,
-      verdict: basicScore >= 70 ? 'PASS' : 'FAIL',
-      feedback: {
-        strengths: totalPassed > 0 ? ['Some test cases passed'] : [],
-        improvements: ['Unable to generate detailed feedback'],
-        detailed_notes: 'Automatic evaluation based on test results only.',
-      },
-    }
+    return createFallbackEvaluation(passRate)
   }
 }
 
