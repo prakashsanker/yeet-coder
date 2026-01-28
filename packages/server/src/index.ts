@@ -5,7 +5,7 @@ import { createConnection } from 'net'
 import 'dotenv/config'
 import executionRoutes from './routes/execution.js'
 import topicsRoutes from './routes/topics.js'
-import questionsRoutes from './routes/questions.js'
+import questionsRoutes, { warmQuestionsCache } from './routes/questions.js'
 import voiceRoutes from './routes/voice.js'
 import interviewsRoutes from './routes/interviews.js'
 import evaluationsRoutes from './routes/evaluations.js'
@@ -83,6 +83,9 @@ async function main() {
     console.log(`Server running on http://localhost:${port}`)
     console.log(`WebSocket server running on ws://localhost:${port}/ws/interview`)
     console.log(`GROQ_API_KEY: ${process.env.GROQ_API_KEY ? 'Set (' + process.env.GROQ_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
+
+    // Warm the questions cache in the background
+    warmQuestionsCache()
   })
 }
 
