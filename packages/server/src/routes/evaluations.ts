@@ -240,6 +240,7 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
     }
 
     const interview = evaluation.interview as {
+      session_type?: string
       final_code?: string
       language: string
       transcript?: TranscriptEntry[]
@@ -247,42 +248,87 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
       time_limit_seconds?: number
       run_count?: number
       submit_count?: number
+      drawing_data?: ExcalidrawData | null
+      notes?: string | null
       question?: Question
     }
 
     const question = interview?.question
     const metadata = question?.metadata as {
       constraints?: string[]
+      key_considerations?: string[]
+      reference_solutions?: SystemDesignReferenceSolutions
     } | null
 
-    const evalInput: EvaluationInput = {
-      interviewId: evaluation.interview_id,
-      questionTitle: question?.title || 'Unknown',
-      questionDescription: question?.description || '',
-      questionConstraints: metadata?.constraints || [],
-      questionDifficulty: (question?.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
-      finalCode: interview?.final_code || '',
-      language: interview?.language || 'python',
-      testResults: (evaluation.test_results as EvaluationInput['testResults']) || {
-        visible: { passed: 0, total: 0 },
-        hidden: { passed: 0, total: 0 },
-      },
-      userTestCases: (evaluation.user_test_cases as TestCase[]) || [],
-      transcript: (interview?.transcript || []) as TranscriptEntry[],
-      timeSpentSeconds: interview?.time_spent_seconds || 0,
-      timeLimitSeconds: interview?.time_limit_seconds || 3600,
-      runCount: interview?.run_count || 0,
-      submitCount: interview?.submit_count || 0,
-    }
+    const sessionType = interview?.session_type || 'coding'
 
-    console.log(`[EVALUATION] Re-running AI evaluation for ${id}`)
+    console.log(`[EVALUATION] Re-running AI evaluation for ${id} (type: ${sessionType})`)
 
-    const evaluationResult = await evaluationService.evaluate(evalInput)
+    let updateData: Record<string, unknown> = {}
 
-    // Update evaluation with new results
-    const { data: updatedEvaluation, error: updateError } = await supabase
-      .from('evaluations')
-      .update({
+    if (sessionType === 'system_design') {
+      // System design evaluation
+      const sdEvalInput: SystemDesignEvaluationInput = {
+        interviewId: evaluation.interview_id,
+        questionTitle: question?.title || 'Unknown',
+        questionDescription: question?.description || '',
+        questionDifficulty: (question?.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
+        keyConsiderations: metadata?.key_considerations || [],
+        referenceSolutions: metadata?.reference_solutions,
+        drawingData: interview?.drawing_data || null,
+        notes: interview?.notes || null,
+        transcript: (interview?.transcript || []) as TranscriptEntry[],
+        timeSpentSeconds: interview?.time_spent_seconds || 0,
+        timeLimitSeconds: interview?.time_limit_seconds || 3600,
+      }
+
+      const sdResult = await systemDesignEvaluationService.evaluate(sdEvalInput)
+      console.log(`[EVALUATION] System design re-run completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}`)
+
+      updateData = {
+        style_rating: sdResult.style_rating,
+        completeness_rating: sdResult.completeness_rating,
+        clarity_score: sdResult.clarity_score,
+        structure_score: sdResult.structure_score,
+        correctness_score: sdResult.correctness_score,
+        requirements_gathering_score: sdResult.requirements_gathering_score,
+        system_components_score: sdResult.system_components_score,
+        scalability_score: sdResult.scalability_score,
+        data_model_score: sdResult.data_model_score,
+        api_design_score: sdResult.api_design_score,
+        trade_offs_score: sdResult.trade_offs_score,
+        communication_score: sdResult.communication_score,
+        overall_score: sdResult.overall_score,
+        feedback: sdResult.feedback,
+        evaluated_drawing: interview?.drawing_data,
+        evaluated_notes: interview?.notes,
+      }
+    } else {
+      // Coding evaluation
+      const evalInput: EvaluationInput = {
+        interviewId: evaluation.interview_id,
+        questionTitle: question?.title || 'Unknown',
+        questionDescription: question?.description || '',
+        questionConstraints: metadata?.constraints || [],
+        questionDifficulty: (question?.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
+        finalCode: interview?.final_code || '',
+        language: interview?.language || 'python',
+        testResults: (evaluation.test_results as EvaluationInput['testResults']) || {
+          visible: { passed: 0, total: 0 },
+          hidden: { passed: 0, total: 0 },
+        },
+        userTestCases: (evaluation.user_test_cases as TestCase[]) || [],
+        transcript: (interview?.transcript || []) as TranscriptEntry[],
+        timeSpentSeconds: interview?.time_spent_seconds || 0,
+        timeLimitSeconds: interview?.time_limit_seconds || 3600,
+        runCount: interview?.run_count || 0,
+        submitCount: interview?.submit_count || 0,
+      }
+
+      const evaluationResult = await evaluationService.evaluate(evalInput)
+      console.log(`[EVALUATION] Coding re-run completed: ${evaluationResult.verdict} (${evaluationResult.overall_score}/100)`)
+
+      updateData = {
         test_case_coverage_score: evaluationResult.test_case_coverage_score,
         thought_process_score: evaluationResult.thought_process_score,
         clarifying_questions_score: evaluationResult.clarifying_questions_score,
@@ -293,7 +339,13 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
         overall_score: evaluationResult.overall_score,
         verdict: evaluationResult.verdict,
         feedback: evaluationResult.feedback,
-      })
+      }
+    }
+
+    // Update evaluation with new results
+    const { data: updatedEvaluation, error: updateError } = await supabase
+      .from('evaluations')
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
@@ -302,8 +354,6 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
       console.error('Error updating evaluation:', updateError)
       return res.status(500).json({ error: 'Failed to update evaluation' })
     }
-
-    console.log(`[EVALUATION] Re-run completed: ${evaluationResult.verdict} (${evaluationResult.overall_score}/100)`)
 
     return res.json({
       success: true,
