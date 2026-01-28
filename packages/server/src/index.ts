@@ -48,6 +48,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
 }
 
 async function main() {
+  console.log('Starting server...')
   const port = await findAvailablePort(DEFAULT_PORT)
 
   const app = express()
