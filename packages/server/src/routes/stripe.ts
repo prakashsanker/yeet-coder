@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { supabase } from '../db/supabase.js'
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js'
 import { serverAnalytics } from '../lib/posthog.js'
+import { facebookAnalytics } from '../lib/facebook.js'
 
 const router = Router()
 
@@ -55,6 +56,12 @@ router.post(
       })
 
       console.log(`[STRIPE] Created checkout session ${session.id} for user ${userId}`)
+
+      // Track checkout initiation with Facebook Conversions API
+      facebookAnalytics.initiateCheckout({
+        userId,
+        email: userEmail,
+      })
 
       return res.json({
         success: true,
@@ -269,6 +276,15 @@ router.post('/webhook', async (req: Request, res: Response) => {
           console.log(`[STRIPE] Upgraded user ${userId} to pro tier`)
           // Track payment completed
           serverAnalytics.paymentCompleted(userId, customerId, session.customer_email || undefined)
+
+          // Track purchase with Facebook Conversions API
+          const amountInDollars = (session.amount_total || 0) / 100
+          facebookAnalytics.purchase({
+            userId,
+            email: session.customer_email || undefined,
+            value: amountInDollars,
+            currency: session.currency?.toUpperCase() || 'USD',
+          })
         }
         break
       }
