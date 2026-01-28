@@ -282,26 +282,34 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
         timeLimitSeconds: interview?.time_limit_seconds || 3600,
       }
 
-      const sdResult = await systemDesignEvaluationService.evaluate(sdEvalInput)
-      console.log(`[EVALUATION] System design re-run completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}`)
+      try {
+        const sdResult = await systemDesignEvaluationService.evaluate(sdEvalInput)
+        console.log(`[EVALUATION] System design re-run completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}`)
 
-      updateData = {
-        style_rating: sdResult.style_rating,
-        completeness_rating: sdResult.completeness_rating,
-        clarity_score: sdResult.clarity_score,
-        structure_score: sdResult.structure_score,
-        correctness_score: sdResult.correctness_score,
-        requirements_gathering_score: sdResult.requirements_gathering_score,
-        system_components_score: sdResult.system_components_score,
-        scalability_score: sdResult.scalability_score,
-        data_model_score: sdResult.data_model_score,
-        api_design_score: sdResult.api_design_score,
-        trade_offs_score: sdResult.trade_offs_score,
-        communication_score: sdResult.communication_score,
-        overall_score: sdResult.overall_score,
-        feedback: sdResult.feedback,
-        evaluated_drawing: interview?.drawing_data,
-        evaluated_notes: interview?.notes,
+        updateData = {
+          style_rating: sdResult.style_rating,
+          completeness_rating: sdResult.completeness_rating,
+          clarity_score: sdResult.clarity_score,
+          structure_score: sdResult.structure_score,
+          correctness_score: sdResult.correctness_score,
+          requirements_gathering_score: sdResult.requirements_gathering_score,
+          system_components_score: sdResult.system_components_score,
+          scalability_score: sdResult.scalability_score,
+          data_model_score: sdResult.data_model_score,
+          api_design_score: sdResult.api_design_score,
+          trade_offs_score: sdResult.trade_offs_score,
+          communication_score: sdResult.communication_score,
+          overall_score: sdResult.overall_score,
+          feedback: sdResult.feedback,
+          evaluated_drawing: interview?.drawing_data,
+          evaluated_notes: interview?.notes,
+        }
+      } catch (evalError) {
+        console.error('[EVALUATION] System design re-run failed:', evalError)
+        return res.status(500).json({
+          error: 'AI evaluation failed. Please try again in a few moments.',
+          details: evalError instanceof Error ? evalError.message : 'Unknown error'
+        })
       }
     } else {
       // Coding evaluation
@@ -325,20 +333,28 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
         submitCount: interview?.submit_count || 0,
       }
 
-      const evaluationResult = await evaluationService.evaluate(evalInput)
-      console.log(`[EVALUATION] Coding re-run completed: ${evaluationResult.verdict} (${evaluationResult.overall_score}/100)`)
+      try {
+        const evaluationResult = await evaluationService.evaluate(evalInput)
+        console.log(`[EVALUATION] Coding re-run completed: ${evaluationResult.verdict} (${evaluationResult.overall_score}/100)`)
 
-      updateData = {
-        test_case_coverage_score: evaluationResult.test_case_coverage_score,
-        thought_process_score: evaluationResult.thought_process_score,
-        clarifying_questions_score: evaluationResult.clarifying_questions_score,
-        edge_case_score: evaluationResult.edge_case_score,
-        time_management_score: evaluationResult.time_management_score,
-        complexity_analysis_score: evaluationResult.complexity_analysis_score,
-        code_quality_score: evaluationResult.code_quality_score,
-        overall_score: evaluationResult.overall_score,
-        verdict: evaluationResult.verdict,
-        feedback: evaluationResult.feedback,
+        updateData = {
+          test_case_coverage_score: evaluationResult.test_case_coverage_score,
+          thought_process_score: evaluationResult.thought_process_score,
+          clarifying_questions_score: evaluationResult.clarifying_questions_score,
+          edge_case_score: evaluationResult.edge_case_score,
+          time_management_score: evaluationResult.time_management_score,
+          complexity_analysis_score: evaluationResult.complexity_analysis_score,
+          code_quality_score: evaluationResult.code_quality_score,
+          overall_score: evaluationResult.overall_score,
+          verdict: evaluationResult.verdict,
+          feedback: evaluationResult.feedback,
+        }
+      } catch (evalError) {
+        console.error('[EVALUATION] Coding re-run failed:', evalError)
+        return res.status(500).json({
+          error: 'AI evaluation failed. Please try again in a few moments.',
+          details: evalError instanceof Error ? evalError.message : 'Unknown error'
+        })
       }
     }
 

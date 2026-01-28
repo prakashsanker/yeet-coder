@@ -87,6 +87,7 @@ async function fetchInterviewMetadata(interviewId: string): Promise<{
   problemTitle?: string
   problemDescription?: string
   keyConsiderations?: string[]
+  answerKey?: string
 }> {
   try {
     const { data: interview, error } = await supabase
@@ -111,14 +112,30 @@ async function fetchInterviewMetadata(interviewId: string): Promise<{
     const question = interview.question as {
       title?: string
       description?: string
-      metadata?: { key_considerations?: string[] }
+      metadata?: {
+        key_considerations?: string[]
+        reference_solutions?: {
+          synthesized_answer_key?: string
+          solutions?: Array<{ solution_text?: string }>
+        }
+      }
     } | null
+
+    // Get the answer key - prefer synthesized, fall back to first scraped solution
+    let answerKey: string | undefined
+    const refSolutions = question?.metadata?.reference_solutions
+    if (refSolutions?.synthesized_answer_key) {
+      answerKey = refSolutions.synthesized_answer_key
+    } else if (refSolutions?.solutions?.[0]?.solution_text) {
+      answerKey = refSolutions.solutions[0].solution_text
+    }
 
     return {
       interviewType: sessionType,
       problemTitle: question?.title,
       problemDescription: question?.description,
       keyConsiderations: question?.metadata?.key_considerations,
+      answerKey,
     }
   } catch (err) {
     console.error(`[RealtimeHandler] Error fetching interview metadata:`, err)
@@ -187,10 +204,16 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
     problemTitle: interviewMeta.problemTitle,
     problemDescription: interviewMeta.problemDescription,
     keyConsiderations: interviewMeta.keyConsiderations,
+    // Pass the answer key so interviewer can guide candidate toward important topics
+    answerKey: interviewMeta.answerKey,
     // Pass the introduction that was already given for context continuity
     introductionGiven: ws.introductionGiven,
     // Pass conversation history context
     conversationContext,
+  }
+
+  if (interviewMeta.answerKey) {
+    console.log(`[RealtimeHandler] Including answer key for guidance (${interviewMeta.answerKey.length} chars)`)
   }
 
   if (ws.introductionGiven) {
@@ -378,6 +401,7 @@ async function handleIntroductionRequest(ws: InterviewWebSocket, introductionTex
       problemTitle: interviewMeta.problemTitle,
       problemDescription: interviewMeta.problemDescription,
       keyConsiderations: interviewMeta.keyConsiderations,
+      answerKey: interviewMeta.answerKey,
     },
     {
       onSessionCreated: () => {

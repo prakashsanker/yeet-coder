@@ -194,6 +194,7 @@ export function buildLiveInterviewInstructions(
     title: string
     description: string
     keyConsiderations?: string[]
+    answerKey?: string  // Reference solution to help guide the candidate
   }
 ): string {
   let instructions = persona.liveInterviewInstructions
@@ -202,6 +203,33 @@ export function buildLiveInterviewInstructions(
 
   if (problemContext.keyConsiderations?.length) {
     instructions += `\n\n**Key areas to probe:**\n${problemContext.keyConsiderations.map(c => `- ${c}`).join('\n')}`
+  }
+
+  // Add answer key for guiding the candidate during requirements phase
+  if (problemContext.answerKey) {
+    instructions += `\n\n---\n\n## ANSWER KEY (Use to Guide Requirements Discussion)
+
+You have access to a reference solution. Use this to help the candidate identify important requirements and features they might miss.
+
+**During Requirements Phase:** If they're missing a critical requirement from the answer key, naturally bring it up:
+- "Oh, one thing we should probably discuss - [topic from answer key]"
+- "That reminds me, we also need to think about [requirement]"
+- "Good question. And related to that - have you thought about [feature]?"
+
+**During Technical Design:** You can ask if they've considered approaches mentioned in the answer key.
+
+**DO NOT:**
+- Read the answer key verbatim to them
+- Tell them "the answer key says..."
+- Give away the complete solution
+
+**DO:**
+- Use it to ensure they cover important topics
+- Help them discover requirements organically
+- Guide them toward critical considerations they might miss
+
+REFERENCE SOLUTION:
+${problemContext.answerKey}`
   }
 
   return instructions

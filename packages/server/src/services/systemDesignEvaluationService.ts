@@ -90,7 +90,9 @@ function summarizeDiagram(elements: ExcalidrawElement[] | undefined): string {
 
   const components: string[] = []
   const allLabels: string[] = []
+  const connections: string[] = []
 
+  // Collect all text labels
   for (const el of elements) {
     if (el.type === 'text') {
       const text = (el.text || el.originalText || '') as string
@@ -98,25 +100,60 @@ function summarizeDiagram(elements: ExcalidrawElement[] | undefined): string {
     }
   }
 
+  // Collect labeled components (boxes, circles, diamonds)
+  const shapeElements: ExcalidrawElement[] = []
   for (const el of elements) {
     if (el.type === 'rectangle' || el.type === 'ellipse' || el.type === 'diamond') {
       const label = findLabelForShape(elements, el)
-      if (label) components.push(label)
+      if (label) {
+        components.push(label)
+        shapeElements.push(el)
+      }
+    }
+  }
+
+  // Analyze arrows/connections
+  const arrows = elements.filter(e => e.type === 'arrow')
+  for (const arrow of arrows) {
+    // Try to find what the arrow connects
+    const startBinding = (arrow as { startBinding?: { elementId?: string } }).startBinding
+    const endBinding = (arrow as { endBinding?: { elementId?: string } }).endBinding
+
+    if (startBinding?.elementId && endBinding?.elementId) {
+      const startEl = elements.find(e => e.id === startBinding.elementId)
+      const endEl = elements.find(e => e.id === endBinding.elementId)
+      if (startEl && endEl) {
+        const startLabel = findLabelForShape(elements, startEl) || startEl.type
+        const endLabel = findLabelForShape(elements, endEl) || endEl.type
+        connections.push(`${startLabel} → ${endLabel}`)
+      }
     }
   }
 
   let summary = ''
+
   if (components.length > 0) {
-    summary += `Components: ${components.join(', ')}\n`
-  } else if (allLabels.length > 0) {
-    summary += `Labels: ${allLabels.join(', ')}\n`
+    summary += `**Components identified:** ${components.join(', ')}\n\n`
+  }
+
+  if (connections.length > 0) {
+    summary += `**Connections:** ${connections.slice(0, 20).join('; ')}\n\n`
+  }
+
+  // Add any standalone labels not associated with shapes
+  const standaloneLabels = allLabels.filter(label => !components.includes(label))
+  if (standaloneLabels.length > 0) {
+    summary += `**Additional labels/annotations:** ${standaloneLabels.slice(0, 30).join(', ')}\n\n`
   }
 
   const rectCount = elements.filter(e => e.type === 'rectangle').length
-  const arrowCount = elements.filter(e => e.type === 'arrow').length
-  summary += `(${rectCount} boxes, ${arrowCount} arrows, ${elements.length} total elements)`
+  const ellipseCount = elements.filter(e => e.type === 'ellipse').length
+  const arrowCount = arrows.length
+  const lineCount = elements.filter(e => e.type === 'line').length
 
-  return summary
+  summary += `**Diagram statistics:** ${rectCount} boxes, ${ellipseCount} circles, ${arrowCount} arrows, ${lineCount} lines, ${elements.length} total elements`
+
+  return summary || 'Diagram contains elements but no identifiable components'
 }
 
 function formatTimestamp(timestamp: number): string {
@@ -249,6 +286,8 @@ The goal is to show the candidate EXACTLY what they should have said, not just t
 
 ## OUTPUT FORMAT
 
+CRITICAL: Your response MUST be a valid JSON object and nothing else. Do NOT include any text, explanations, code blocks, or SQL before or after the JSON. Start your response with { and end with }.
+
 Return valid JSON:
 
 {
@@ -339,18 +378,71 @@ export async function evaluateSystemDesignInterview(
   input: SystemDesignEvaluationInput,
   options: { model?: LLMModel } = {}
 ): Promise<SystemDesignEvaluationResult> {
-  const { model = 'anthropic/claude-opus-4.5' } = options
+  // Helper function to create fallback evaluation
+  const createFallbackEvaluation = (hasContent: boolean): SystemDesignEvaluationResult => ({
+    style_rating: 'adequate',
+    completeness_rating: 'adequate',
+    clarity_score: 50,
+    structure_score: 50,
+    correctness_score: 50,
+    requirements_gathering_score: 50,
+    system_components_score: 50,
+    scalability_score: 50,
+    data_model_score: 50,
+    api_design_score: 50,
+    trade_offs_score: 50,
+    communication_score: 50,
+    overall_score: 50,
+    feedback: {
+      style: {
+        rating: 'adequate',
+        assessment: 'Unable to generate detailed feedback due to an error.',
+        strengths: hasContent ? [{ point: 'Submitted work', example: 'Diagram and/or notes were provided' }] : [],
+        improvements: []
+      },
+      completeness: {
+        rating: 'adequate',
+        assessment: 'Unable to compare against reference solution.',
+        covered_well: [],
+        gaps: []
+      },
+      recommendations: [
+        {
+          title: 'Try again',
+          explanation: 'We encountered an error generating feedback. Please try submitting again.'
+        }
+      ],
+      summary: 'Evaluation could not be completed. Please try again.',
+      good_points: [],
+      areas_for_improvement: [],
+      detailed_notes: {
+        requirements: '',
+        architecture: '',
+        scalability: '',
+        data_model: '',
+        api_design: '',
+        trade_offs: '',
+        communication: '',
+      },
+      missed_components: [],
+      study_recommendations: [],
+    },
+  })
 
-  const diagramSummary = summarizeDiagram(input.drawingData?.elements)
-  const referenceSolutionText = formatReferenceSolutions(input.referenceSolutions)
-  const hasReference = input.referenceSolutions?.solutions && input.referenceSolutions.solutions.length > 0
+  try {
+    // Note: Using Sonnet instead of Opus because Opus has JSON formatting issues via OpenRouter
+    const { model = 'anthropic/claude-sonnet-4' } = options
 
-  // Build the system prompt with persona and reference solution
-  const systemPrompt = buildSystemDesignEvaluationPrompt(
-    hasReference ? referenceSolutionText : undefined
-  )
+    const diagramSummary = summarizeDiagram(input.drawingData?.elements)
+    const referenceSolutionText = formatReferenceSolutions(input.referenceSolutions)
+    const hasReference = input.referenceSolutions?.solutions && input.referenceSolutions.solutions.length > 0
 
-  const userPrompt = `## QUESTION
+    // Build the system prompt with persona and reference solution
+    const systemPrompt = buildSystemDesignEvaluationPrompt(
+      hasReference ? referenceSolutionText : undefined
+    )
+
+    const userPrompt = `## QUESTION
 
 **${input.questionTitle}** (${input.questionDifficulty})
 
@@ -370,11 +462,6 @@ ${formatTranscript(input.transcript)}
 
 ${diagramSummary}
 
-Raw elements:
-\`\`\`json
-${JSON.stringify(input.drawingData?.elements || [], null, 2)}
-\`\`\`
-
 ---
 
 ## CANDIDATE'S NOTES
@@ -391,7 +478,9 @@ Spent: ${Math.floor(input.timeSpentSeconds / 60)}m ${input.timeSpentSeconds % 60
 
 Please provide detailed feedback on this candidate's system design interview, evaluating their STYLE and COMPLETENESS.`
 
-  try {
+    console.log(`[SD_EVALUATION] Prompt size: system=${systemPrompt.length} chars, user=${userPrompt.length} chars, total=${systemPrompt.length + userPrompt.length} chars`)
+    console.log(`[SD_EVALUATION] Calling LLM with model: ${model}`)
+
     const result = await llm.generateJSON<{
       style: SystemDesignFeedback['style'] & {
         requirements_gathering?: 'thorough' | 'partial' | 'skipped'
@@ -410,7 +499,7 @@ Please provide detailed feedback on this candidate's system design interview, ev
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { model, temperature: 0.3, maxTokens: 8000 }
+      { model, temperature: 0.3, maxTokens: 16000 }
     )
 
     // Convert ratings to numeric scores for backward compatibility
@@ -492,61 +581,16 @@ Please provide detailed feedback on this candidate's system design interview, ev
     }
   } catch (error) {
     console.error('[SYSTEM_DESIGN_EVALUATION] Error:', error)
+    if (error instanceof Error) {
+      console.error('[SYSTEM_DESIGN_EVALUATION] Error message:', error.message)
+    }
 
     // Fallback evaluation
     const hasContent = (input.drawingData?.elements?.length || 0) > 0 ||
                        (input.notes?.length || 0) > 0 ||
                        (input.transcript?.length || 0) > 0
 
-    return {
-      style_rating: 'adequate',
-      completeness_rating: 'adequate',
-      clarity_score: 50,
-      structure_score: 50,
-      correctness_score: 50,
-      requirements_gathering_score: 50,
-      system_components_score: 50,
-      scalability_score: 50,
-      data_model_score: 50,
-      api_design_score: 50,
-      trade_offs_score: 50,
-      communication_score: 50,
-      overall_score: 50,
-      feedback: {
-        style: {
-          rating: 'adequate',
-          assessment: 'Unable to generate detailed feedback due to an error.',
-          strengths: hasContent ? [{ point: 'Submitted work', example: 'Diagram and/or notes were provided' }] : [],
-          improvements: []
-        },
-        completeness: {
-          rating: 'adequate',
-          assessment: 'Unable to compare against reference solution.',
-          covered_well: [],
-          gaps: []
-        },
-        recommendations: [
-          {
-            title: 'Try again',
-            explanation: 'We encountered an error generating feedback. Please try submitting again.'
-          }
-        ],
-        summary: 'Evaluation could not be completed. Please try again.',
-        good_points: [],
-        areas_for_improvement: [],
-        detailed_notes: {
-          requirements: '',
-          architecture: '',
-          scalability: '',
-          data_model: '',
-          api_design: '',
-          trade_offs: '',
-          communication: '',
-        },
-        missed_components: [],
-        study_recommendations: [],
-      },
-    }
+    return createFallbackEvaluation(hasContent)
   }
 }
 
