@@ -63,8 +63,8 @@ export default function GeneratingEvaluation() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-lc-text-primary mb-2">Evaluation Failed</h2>
-            <p className="text-lc-text-muted mb-6">{error}</p>
+            <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Evaluation Failed</h2>
+            <p className="text-[var(--text-muted)] mb-6">{error}</p>
             <button
               onClick={() => navigate('/dashboard')}
               className="btn-primary"
@@ -85,24 +85,24 @@ export default function GeneratingEvaluation() {
           {/* Animated icon */}
           <div className="relative w-24 h-24 mx-auto mb-8">
             {/* Outer ring */}
-            <div className="absolute inset-0 rounded-full border-4 border-brand-orange/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-accent-purple/30"></div>
             {/* Spinning ring */}
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-orange animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-accent-purple animate-spin"></div>
             {/* Inner icon */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-10 h-10 text-brand-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-10 h-10 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl font-bold text-lc-text-primary mb-3">
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-3">
             Generating Your Evaluation
           </h2>
 
           {/* Cycling message */}
-          <p className="text-lc-text-secondary mb-6 h-6 transition-opacity duration-500">
+          <p className="text-[var(--text-secondary)] mb-6 h-6 transition-opacity duration-500">
             {LOADING_MESSAGES[messageIndex]}
           </p>
 
@@ -112,14 +112,14 @@ export default function GeneratingEvaluation() {
               <div
                 key={i}
                 className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                  i === messageIndex % 3 ? 'bg-brand-orange' : 'bg-brand-orange/30'
+                  i === messageIndex % 3 ? 'bg-accent-purple' : 'bg-accent-purple/30'
                 }`}
               />
             ))}
           </div>
 
           {/* Info text */}
-          <p className="text-sm text-lc-text-muted">
+          <p className="text-sm text-[var(--text-muted)]">
             Our AI interviewer is reviewing your design against the answer key.
             <br />
             This usually takes 15-30 seconds.

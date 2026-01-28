@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
-import { API_URL } from '../lib/api'
+import { API_URL, api } from '../lib/api'
 
 interface TestResults {
   visible: { passed: number; total: number }
@@ -157,6 +157,8 @@ export default function Evaluation() {
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [retryError, setRetryError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadEvaluation() {
@@ -191,6 +193,26 @@ export default function Evaluation() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const handleRetryEvaluation = async () => {
+    if (!id || isRetrying) return
+
+    setIsRetrying(true)
+    setRetryError(null)
+
+    try {
+      const result = await api.evaluations.rerun(id)
+      if (result.evaluation) {
+        // Reload the page to get fresh data with interview info
+        window.location.reload()
+      }
+    } catch (err) {
+      console.error('Failed to retry evaluation:', err)
+      setRetryError(err instanceof Error ? err.message : 'Failed to generate evaluation. Please try again.')
+    } finally {
+      setIsRetrying(false)
+    }
   }
 
   if (isLoading) {
@@ -356,18 +378,22 @@ export default function Evaluation() {
             {hasScores ? (
               isSystemDesign ? (
                 // System Design Evaluation Display
-                <SystemDesignEvaluationDisplay evaluation={evaluation} />
+                <SystemDesignEvaluationDisplay
+                  evaluation={evaluation}
+                  onRetry={handleRetryEvaluation}
+                  isRetrying={isRetrying}
+                />
               ) : (
                 // Coding Evaluation Display
                 <CodingEvaluationDisplay evaluation={evaluation} />
               )
             ) : (
-              /* Pending Evaluation */
+              /* Pending Evaluation - offer retry */
               <div className="card p-8 text-center mb-8">
-                <div className="animate-pulse mb-4">
-                  <div className="w-16 h-16 bg-accent-purple/20 rounded-full mx-auto flex items-center justify-center">
+                <div className="mb-4">
+                  <div className="w-16 h-16 bg-amber-100 rounded-full mx-auto flex items-center justify-center">
                     <svg
-                      className="w-8 h-8 text-accent-purple"
+                      className="w-8 h-8 text-amber-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -376,17 +402,39 @@ export default function Evaluation() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                       />
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-semibold text-landing-primary mb-2">Interview Submitted!</h3>
-                <p className="text-landing-muted mb-4">
-                  Your submission has been recorded. AI evaluation is being generated...
+                <h3 className="text-xl font-semibold text-landing-primary mb-2">Evaluation Incomplete</h3>
+                <p className="text-landing-muted mb-6">
+                  Your interview was recorded but the AI evaluation didn't complete.
+                  <br />
+                  This can happen due to network issues. Click below to generate your evaluation.
                 </p>
-                <p className="text-sm text-landing-muted">
-                  Refresh the page in a few moments to see your detailed feedback.
+                {retryError && (
+                  <p className="text-red-600 text-sm mb-4">{retryError}</p>
+                )}
+                <button
+                  onClick={handleRetryEvaluation}
+                  disabled={isRetrying}
+                  className="btn-primary px-6 py-3"
+                >
+                  {isRetrying ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generating Evaluation...
+                    </>
+                  ) : (
+                    'Generate Evaluation'
+                  )}
+                </button>
+                <p className="text-xs text-landing-muted mt-4">
+                  This usually takes 15-30 seconds.
                 </p>
               </div>
             )}
@@ -487,16 +535,47 @@ function ImportanceBadge({ importance }: { importance: 'critical' | 'important' 
 }
 
 // System Design Evaluation Display Component - NEW with Style + Completeness
-function SystemDesignEvaluationDisplay({ evaluation }: { evaluation: EvaluationData }) {
+function SystemDesignEvaluationDisplay({ evaluation, onRetry, isRetrying }: {
+  evaluation: EvaluationData
+  onRetry?: () => void
+  isRetrying?: boolean
+}) {
   const feedback = evaluation.feedback as SystemDesignFeedback | undefined
   const isNewStructure = feedback && hasNewFeedbackStructure(feedback)
+
+  // Check if the feedback indicates an error/incomplete evaluation
+  const hasErrorInFeedback = feedback?.summary?.toLowerCase().includes('could not be completed') ||
+    feedback?.summary?.toLowerCase().includes('error') ||
+    feedback?.style?.assessment?.toLowerCase().includes('unable to generate') ||
+    feedback?.style?.assessment?.toLowerCase().includes('error')
 
   // If using new structure, render new UI
   if (isNewStructure && feedback) {
     return (
       <>
+        {/* Retry Banner - Show if feedback indicates error */}
+        {hasErrorInFeedback && onRetry && (
+          <div className="mb-8 p-6 rounded-lg bg-amber-50 border border-amber-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-amber-800 mb-1">Evaluation Incomplete</h3>
+                <p className="text-amber-700 text-sm">
+                  The detailed feedback could not be generated. Click to retry.
+                </p>
+              </div>
+              <button
+                onClick={onRetry}
+                disabled={isRetrying}
+                className="btn-primary px-4 py-2 text-sm"
+              >
+                {isRetrying ? 'Retrying...' : 'Retry Evaluation'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Overall Summary */}
-        {feedback.summary && (
+        {feedback.summary && !hasErrorInFeedback && (
           <div className="mb-8 p-6 rounded-lg bg-white border border-black/10">
             <h3 className="text-lg font-semibold mb-3 text-landing-primary">Summary</h3>
             <p className="text-landing-secondary leading-relaxed whitespace-pre-wrap">{feedback.summary}</p>

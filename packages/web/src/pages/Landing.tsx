@@ -224,12 +224,12 @@ export default function Landing() {
           </div>
 
           <h1 className="text-[clamp(2.5rem,6vw,4rem)] leading-[1.1] font-semibold tracking-tight text-[var(--text-primary)] mb-6">
-            Real-Life Practice for<br />
-            <span className="text-[var(--text-secondary)]">System Design Interviews</span>
+            The interview is verbal.<br />
+            <span className="text-[var(--text-secondary)]">Your practice should be too.</span>
           </h1>
 
           <p className="text-[clamp(1.125rem,2.5vw,1.375rem)] leading-relaxed text-[var(--text-secondary)] max-w-[650px] mx-auto mb-10">
-            Practice verbally. Get instant feedback. Nail that job.
+            AI voice practice for system design interviews.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
@@ -295,90 +295,16 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* Browser Mockup */}
-        <div className="max-w-[1000px] mx-auto cursor-pointer group">
-          <div className="bg-white rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 group-hover:shadow-3xl group-hover:-translate-y-1">
-            {/* Browser Chrome */}
-            <div className="bg-gray-100 px-4 py-3 flex items-center gap-4 border-b border-gray-200">
-              <div className="flex gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-red-400" />
-                <span className="w-3 h-3 rounded-full bg-amber-400" />
-                <span className="w-3 h-3 rounded-full bg-green-400" />
-              </div>
-              <div className="flex-1 bg-white px-3 py-1.5 rounded-md text-xs font-mono text-[var(--text-muted)]">
-                yeetcoder.com/practice
-              </div>
-            </div>
-
-            {/* App Interface */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr] gap-px bg-gray-200 min-h-[400px]">
-              {/* Left Panel - Question */}
-              <div className="bg-white p-5 hidden lg:block">
-                <div className="flex items-center gap-2 font-mono text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-4">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  System Design Challenge
-                </div>
-                <div className="bg-[var(--bg-section)] rounded-xl p-4 mb-4">
-                  <h4 className="font-semibold text-[var(--text-primary)] mb-2">Design a URL Shortener</h4>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-3">
-                    Like bit.ly or TinyURL. Consider scalability, availability, and analytics.
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="font-mono text-[10px] px-2 py-1 bg-white rounded-full text-[var(--text-muted)]">Distributed Systems</span>
-                    <span className="font-mono text-[10px] px-2 py-1 bg-white rounded-full text-[var(--text-muted)]">Database</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 font-mono text-xl font-medium text-[var(--text-primary)]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  12:34
-                </div>
-              </div>
-
-              {/* Center - Voice Interface */}
-              <div className="bg-gradient-to-b from-warm-card-purple to-white flex items-center justify-center p-8">
-                <div className="text-center">
-                  <div className="relative w-24 h-24 mx-auto mb-4">
-                    <div className="absolute inset-0 rounded-full bg-accent-purple opacity-30 animate-voice-pulse" />
-                    <div className="absolute inset-0 rounded-full bg-white shadow-lg flex items-center justify-center">
-                      <svg className="w-10 h-10 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium text-accent-purple mb-4">Listening...</p>
-                  <p className="text-sm text-[var(--text-secondary)] italic max-w-[280px] mx-auto leading-relaxed">
-                    "For the URL shortener, I'd start by clarifying the requirements. We need to handle reads and writes, probably with a read-heavy ratio..."
-                  </p>
-                </div>
-              </div>
-
-              {/* Right Panel - AI Feedback */}
-              <div className="bg-white p-5 hidden lg:block">
-                <div className="flex items-center gap-2 font-mono text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider mb-4">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Live AI Analysis
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Requirements gathering', done: true },
-                    { label: 'Scale estimation', done: true },
-                    { label: 'High-level design...', done: false },
-                    { label: 'Deep dive pending', done: false },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-                      <span className={`w-2 h-2 rounded-full ${item.done ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
-                      {item.label} {item.done && '✓'}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        {/* Loom Video Embed */}
+        <div className="max-w-[1000px] mx-auto">
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src="https://www.loom.com/embed/18cda7b4b867441e8d7a1c7f143be12a?sid=18cda7b4b867441e8d7a1c7f143be12a"
+              frameBorder="0"
+              allowFullScreen
+              className="absolute top-0 left-0 w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            />
           </div>
         </div>
       </section>
