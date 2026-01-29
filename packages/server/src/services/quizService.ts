@@ -115,66 +115,36 @@ function buildQuestionPrompt(input: GenerateQuestionsInput): string {
     scenario: `Generate scenario-based questions that describe a real-world situation and ask what the best approach would be. Include 4 options (A, B, C, D) representing different approaches.`,
   }
 
-  return `You are an expert system design interviewer creating practice questions.
+  return `Generate ${input.count} ${input.difficulty} ${input.questionType.replace('_', ' ')} questions about "${input.topic}" for system design interview practice.
 
-## Topic
-${input.topic}
+Topic context: ${topicContext}
 
-## Topic Context
-${topicContext}
+Difficulty: ${input.difficulty} - ${difficultyGuidelines[input.difficulty]}
 
-## Difficulty Level
-${input.difficulty}
-${difficultyGuidelines[input.difficulty]}
+Question type: ${typeGuidelines[input.questionType]}
 
-## Question Type
-${input.questionType}
-${typeGuidelines[input.questionType]}
+Requirements:
+- Each question tests a different aspect of the topic
+- Questions are practical and interview-relevant
+- Explanations are educational
+- Wrong answer explanations explain WHY that answer is incorrect
 
-## Requirements
-1. Generate ${input.count} unique questions about "${input.topic}"
-2. Each question should test a different aspect of the topic
-3. Questions should be practical and relevant to system design interviews
-4. Explanations should be educational and help the user learn
-5. Wrong answer explanations should explain WHY that answer is incorrect
+CRITICAL: Respond with ONLY valid JSON. No markdown, no explanation, no text before or after. Start with { and end with }.
 
-## Output Format
-Return valid JSON with the following structure:
+JSON schema:
+{"questions":[{"question_text":"string","options":[{"text":"string","is_correct":boolean}],"correct_answer":"string","explanation":"string","wrong_explanations":{"option_text":"why_wrong"}}]}
 
-{
-  "questions": [
-    {
-      "question_text": "The question text",
-      "options": [
-        { "text": "Option A text", "is_correct": false },
-        { "text": "Option B text", "is_correct": true },
-        { "text": "Option C text", "is_correct": false },
-        { "text": "Option D text", "is_correct": false }
-      ],
-      "correct_answer": "Option B text",
-      "explanation": "Detailed explanation of why this is correct and what the user should learn from this",
-      "wrong_explanations": {
-        "Option A text": "Why this option is wrong",
-        "Option C text": "Why this option is wrong",
-        "Option D text": "Why this option is wrong"
-      }
-    }
-  ]
-}
+${input.questionType === 'true_false' ? 'For true/false: use only "True" and "False" as option texts.' : 'Include exactly 4 options per question.'}
 
-${input.questionType === 'true_false' ? `
-For true/false questions, use only two options:
-{ "text": "True", "is_correct": true/false },
-{ "text": "False", "is_correct": false/true }
-` : ''}
-
-Generate ${input.count} questions now:`
+Output ONLY the JSON object:`
 }
 
 function generateContentHash(question: { question_text: string; topic: string }): string {
   const content = `${question.topic}:${question.question_text}`.toLowerCase()
   return crypto.createHash('md5').update(content).digest('hex').slice(0, 16)
 }
+
+const MAX_JSON_RETRIES = 3
 
 export async function generateQuizQuestions(
   input: GenerateQuestionsInput,
@@ -187,48 +157,85 @@ export async function generateQuizQuestions(
 
   const prompt = buildQuestionPrompt(input)
 
-  try {
-    const result = await llm.generateJSON<{
-      questions: Array<{
-        question_text: string
-        options: Array<{ text: string; is_correct: boolean }>
-        correct_answer: string
-        explanation: string
-        wrong_explanations: Record<string, string>
-      }>
-    }>(
-      [
-        { role: 'system', content: 'You are a system design expert creating educational quiz questions. Always return valid JSON.' },
-        { role: 'user', content: prompt },
-      ],
-      { model, temperature: 0.7, maxTokens: 8000 }
-    )
+  let lastError: Error | null = null
 
-    // Process and hash questions
-    const questions: QuizQuestion[] = result.questions.map(q => {
-      const hash = generateContentHash({ question_text: q.question_text, topic: input.topic })
-      return {
-        question_text: q.question_text,
-        question_type: input.questionType,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation,
-        wrong_explanations: q.wrong_explanations || {},
-        content_hash: hash,
+  for (let attempt = 1; attempt <= MAX_JSON_RETRIES; attempt++) {
+    try {
+      if (attempt > 1) {
+        console.log(`[QUIZ] Retry attempt ${attempt}/${MAX_JSON_RETRIES}`)
       }
-    })
 
-    // Filter out questions with hashes that already exist
-    const existingHashSet = new Set(input.existingHashes || [])
-    const uniqueQuestions = questions.filter(q => !existingHashSet.has(q.content_hash))
+      const result = await llm.generateJSON<{
+        questions: Array<{
+          question_text: string
+          options: Array<{ text: string; is_correct: boolean }>
+          correct_answer: string
+          explanation: string
+          wrong_explanations: Record<string, string>
+        }>
+      }>(
+        [
+          {
+            role: 'system',
+            content: 'You are a system design quiz generator. Output ONLY valid JSON with no markdown formatting, no code blocks, no explanatory text. Start your response with { and end with }.'
+          },
+          { role: 'user', content: prompt },
+        ],
+        { model, temperature: 0.5, maxTokens: 8000 }
+      )
 
-    console.log(`[QUIZ] Generated ${uniqueQuestions.length} unique questions (${questions.length - uniqueQuestions.length} duplicates filtered)`)
+      // Validate the response structure
+      if (!result || !Array.isArray(result.questions) || result.questions.length === 0) {
+        throw new Error('Invalid response structure: missing or empty questions array')
+      }
 
-    return uniqueQuestions
-  } catch (error) {
-    console.error('[QUIZ] Error generating questions:', error)
-    throw error
+      // Validate each question has required fields
+      for (const q of result.questions) {
+        if (!q.question_text || !Array.isArray(q.options) || !q.correct_answer || !q.explanation) {
+          throw new Error('Invalid question structure: missing required fields')
+        }
+      }
+
+      // Process and hash questions
+      const questions: QuizQuestion[] = result.questions.map(q => {
+        const hash = generateContentHash({ question_text: q.question_text, topic: input.topic })
+        return {
+          question_text: q.question_text,
+          question_type: input.questionType,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation,
+          wrong_explanations: q.wrong_explanations || {},
+          content_hash: hash,
+        }
+      })
+
+      // Filter out questions with hashes that already exist
+      const existingHashSet = new Set(input.existingHashes || [])
+      const uniqueQuestions = questions.filter(q => !existingHashSet.has(q.content_hash))
+
+      console.log(`[QUIZ] Generated ${uniqueQuestions.length} unique questions (${questions.length - uniqueQuestions.length} duplicates filtered)`)
+
+      return uniqueQuestions
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.error(`[QUIZ] Attempt ${attempt} failed:`, lastError.message)
+
+      // If it's a JSON parsing or validation error, retry
+      const isRetryable =
+        lastError.message.includes('JSON') ||
+        lastError.message.includes('parse') ||
+        lastError.message.includes('Invalid') ||
+        lastError.message.includes('missing')
+
+      if (!isRetryable || attempt === MAX_JSON_RETRIES) {
+        break
+      }
+    }
   }
+
+  console.error('[QUIZ] All retries failed')
+  throw lastError || new Error('Failed to generate quiz questions')
 }
 
 export const quizService = {
