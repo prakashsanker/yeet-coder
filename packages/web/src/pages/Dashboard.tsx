@@ -1023,12 +1023,20 @@ export default function Dashboard() {
                                 isSelected
                                   ? 'border-[var(--accent-purple)] bg-[#F3E5F5]'
                                   : !patternUnlocked
-                                  ? 'border-[rgba(0,0,0,0.08)] bg-[rgba(0,0,0,0.02)] opacity-70'
-                                  : 'border-[rgba(0,0,0,0.1)] bg-white hover:border-[var(--text-muted)]'
+                                  ? 'border-[rgba(0,0,0,0.06)] bg-[#F5F5F5]'
+                                  : 'border-[rgba(0,0,0,0.1)] bg-white hover:border-[var(--accent-purple)]'
                               }`}
                             >
-                              {/* Progress badge */}
-                              {user && progress.total > 0 && (
+                              {/* PRO badge for locked patterns */}
+                              {!patternUnlocked && (
+                                <div className="absolute -top-2 -right-2">
+                                  <span className="px-2 py-0.5 bg-gradient-to-r from-[#7C3AED] to-[#9333EA] text-white text-[10px] font-bold rounded-full shadow-sm">
+                                    PRO
+                                  </span>
+                                </div>
+                              )}
+                              {/* Progress badge for unlocked patterns */}
+                              {patternUnlocked && user && progress.total > 0 && (
                                 <div className="absolute -top-2 -right-2">
                                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                                     progress.completed === progress.total
@@ -1042,9 +1050,9 @@ export default function Dashboard() {
                                 </div>
                               )}
 
-                              <h3 className="font-medium text-[var(--text-primary)] text-sm mb-1 flex items-center gap-1">
+                              <h3 className={`font-medium text-sm mb-1 flex items-center gap-1.5 ${!patternUnlocked ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
                                 {!patternUnlocked && (
-                                  <svg className="w-3 h-3 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                   </svg>
                                 )}
