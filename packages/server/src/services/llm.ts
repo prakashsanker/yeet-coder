@@ -44,6 +44,9 @@ export interface LLMOptions {
 
 const DEFAULT_MODEL: LLMModel = 'llama-3.1-8b-instant'
 
+// Timeout for LLM requests (5 minutes - long evaluations can take a while)
+const LLM_TIMEOUT_MS = 5 * 60 * 1000
+
 function getOpenRouterClient(): OpenAI {
   if (!OPENROUTER_API_KEY) {
     throw new Error('OPENROUTER_API_KEY is not set')
@@ -52,6 +55,7 @@ function getOpenRouterClient(): OpenAI {
   return new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: OPENROUTER_API_KEY,
+    timeout: LLM_TIMEOUT_MS,
     defaultHeaders: {
       'HTTP-Referer': 'https://yeetcoder.com',
       'X-Title': 'YeetCoder',
@@ -176,6 +180,14 @@ function sanitizeJsonString(content: string): string {
   })
 }
 
+// Retry configuration
+const MAX_RETRIES = 2
+const INITIAL_RETRY_DELAY_MS = 2000
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 export async function generateJSON<T>(
   messages: LLMMessage[],
   options: LLMOptions = {}
@@ -184,48 +196,87 @@ export async function generateJSON<T>(
   const client = getClient(model)
   const provider = isGroqModel(model) ? 'Groq' : 'OpenRouter'
 
-  console.log(`[LLM] ${provider} JSON request started | model: ${model}`)
-  const startTime = Date.now()
+  let lastError: Error | null = null
 
-  const response = await client.chat.completions.create({
-    model,
-    messages,
-    temperature,
-    max_tokens: maxTokens,
-  })
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1)
+        console.log(`[LLM] Retry attempt ${attempt}/${MAX_RETRIES} after ${delay}ms delay`)
+        await sleep(delay)
+      }
 
-  const elapsed = Date.now() - startTime
-  const usage = response.usage
-  const finishReason = response.choices[0]?.finish_reason
-  console.log(
-    `[LLM] ${provider} JSON response received | model: ${model} | ${elapsed}ms` +
-      (usage ? ` | tokens: ${usage.prompt_tokens} in / ${usage.completion_tokens} out` : '') +
-      ` | finish_reason: ${finishReason}`
-  )
+      console.log(`[LLM] ${provider} JSON request started | model: ${model}${attempt > 0 ? ` | attempt: ${attempt + 1}` : ''}`)
+      const startTime = Date.now()
 
-  if (finishReason === 'length') {
-    console.warn(`[LLM] WARNING: Response was truncated due to max_tokens limit!`)
+      const response = await client.chat.completions.create({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+      })
+
+      const elapsed = Date.now() - startTime
+      const usage = response.usage
+      const finishReason = response.choices[0]?.finish_reason
+      console.log(
+        `[LLM] ${provider} JSON response received | model: ${model} | ${elapsed}ms` +
+          (usage ? ` | tokens: ${usage.prompt_tokens} in / ${usage.completion_tokens} out` : '') +
+          ` | finish_reason: ${finishReason}`
+      )
+
+      if (finishReason === 'length') {
+        console.warn(`[LLM] WARNING: Response was truncated due to max_tokens limit!`)
+      }
+
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        throw new Error('No content in LLM response')
+      }
+
+      // Extract JSON from response (handles text before JSON, markdown blocks, etc.)
+      let jsonContent = extractJSON(content)
+
+      // Sanitize control characters in string values (common issue with smaller models)
+      jsonContent = sanitizeJsonString(jsonContent)
+
+      try {
+        return JSON.parse(jsonContent) as T
+      } catch (parseError) {
+        // Log the problematic JSON for debugging
+        console.error('[LLM] Failed to parse JSON from LLM. Raw content:')
+        console.error(jsonContent.slice(0, 500) + '...')
+        throw parseError
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      const errorMessage = lastError.message.toLowerCase()
+
+      // Log the error with details
+      console.error(`[LLM] Error on attempt ${attempt + 1}/${MAX_RETRIES + 1}: ${lastError.message}`)
+
+      // Check if this is a retryable error
+      const isRetryable =
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('429') ||
+        errorMessage.includes('500') ||
+        errorMessage.includes('502') ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('504') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('connection')
+
+      if (!isRetryable || attempt === MAX_RETRIES) {
+        console.error(`[LLM] Non-retryable error or max retries reached. Giving up.`)
+        throw lastError
+      }
+
+      console.log(`[LLM] Retryable error detected, will retry...`)
+    }
   }
 
-  const content = response.choices[0]?.message?.content
-  if (!content) {
-    throw new Error('No content in LLM response')
-  }
-
-  // Extract JSON from response (handles text before JSON, markdown blocks, etc.)
-  let jsonContent = extractJSON(content)
-
-  // Sanitize control characters in string values (common issue with smaller models)
-  jsonContent = sanitizeJsonString(jsonContent)
-
-  try {
-    return JSON.parse(jsonContent) as T
-  } catch (error) {
-    // Log the problematic JSON for debugging
-    console.error('[LLM] Failed to parse JSON from LLM. Raw content:')
-    console.error(jsonContent.slice(0, 500) + '...')
-    throw error
-  }
+  throw lastError || new Error('Unknown LLM error')
 }
 
 export const llm = {
