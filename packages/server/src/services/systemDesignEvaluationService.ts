@@ -63,6 +63,9 @@ export interface SystemDesignEvaluationResult {
   overall_score: number
 
   feedback: SystemDesignFeedback
+
+  // Weak areas detected - specific concepts the candidate should practice
+  weak_areas: string[]
 }
 
 // ============================================
@@ -344,6 +347,12 @@ Return valid JSON:
     }
   ],
 
+  "weak_areas": [
+    "<specific concept they should study, e.g. 'cache invalidation strategies'>",
+    "<another concept, e.g. 'database sharding'>",
+    "<max 5 concepts they struggled with most>"
+  ],
+
   "summary": "<1-2 paragraph summary - be direct about whether they would pass at Google>"
 }
 
@@ -393,6 +402,7 @@ export async function evaluateSystemDesignInterview(
     trade_offs_score: 50,
     communication_score: 50,
     overall_score: 50,
+    weak_areas: [],
     feedback: {
       style: {
         rating: 'adequate',
@@ -498,6 +508,7 @@ Please provide detailed feedback on this candidate's system design interview, ev
         answer_key_coverage_percent?: number
       }
       recommendations: SystemDesignFeedback['recommendations']
+      weak_areas?: string[]
       summary: string
     }>(
       [
@@ -565,6 +576,14 @@ Please provide detailed feedback on this candidate's system design interview, ev
       study_recommendations: result.recommendations?.map(r => r.title) || [],
     }
 
+    // Extract weak areas from gaps if not explicitly provided
+    const weakAreas = result.weak_areas?.length
+      ? result.weak_areas
+      : (result.completeness?.gaps || [])
+          .filter(gap => gap.importance === 'critical' || gap.importance === 'important')
+          .slice(0, 5)
+          .map(gap => gap.topic)
+
     return {
       style_rating: result.style?.rating || 'adequate',
       completeness_rating: result.completeness?.rating || 'adequate',
@@ -583,6 +602,7 @@ Please provide detailed feedback on this candidate's system design interview, ev
       overall_score: overallScore,
 
       feedback,
+      weak_areas: weakAreas,
     }
   } catch (error) {
     console.error('[SYSTEM_DESIGN_EVALUATION] Error:', error)
