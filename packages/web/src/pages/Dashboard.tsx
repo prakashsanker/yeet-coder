@@ -40,8 +40,8 @@ const CODING_ROADMAP_ORDER = [
   ['math-geometry', 'bit-manipulation'],
 ]
 
-// Number of free questions for free tier users
-const FREE_QUESTION_LIMIT = 2
+// Free tier only gets Pattern 1 (Hashing & ID Generation)
+const FREE_PATTERN = 1
 
 interface RoadmapQuestion {
   order: number
@@ -505,9 +505,9 @@ export default function Dashboard() {
   // System Design Roadmap helpers
   const isPro = subscription?.tier === 'pro'
 
-  const isSDQuestionUnlocked = (questionOrder: number) => {
+  const isPatternUnlocked = (patternNum: number) => {
     if (isPro) return true
-    return questionOrder <= FREE_QUESTION_LIMIT
+    return patternNum === FREE_PATTERN
   }
 
   const isSDQuestionCompleted = (questionId: string) => {
@@ -540,8 +540,8 @@ export default function Dashboard() {
     return { completed, total }
   }
 
-  const handleStartSDPractice = (question: RoadmapQuestion) => {
-    if (!isSDQuestionUnlocked(question.order)) {
+  const handleStartSDPractice = (question: RoadmapQuestion, patternNum: number) => {
+    if (!isPatternUnlocked(patternNum)) {
       setShowPaywall(true)
       return
     }
@@ -936,7 +936,7 @@ export default function Dashboard() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
-                Free tier: {FREE_QUESTION_LIMIT} questions unlocked.
+                Free tier: Pattern 1 unlocked (2 questions).
                 <button
                   onClick={() => setShowPaywall(true)}
                   className="font-medium underline hover:no-underline"
@@ -1013,6 +1013,7 @@ export default function Dashboard() {
 
                           const progress = getPatternProgress(pattern)
                           const isSelected = selectedPattern?.pattern === pattern.pattern
+                          const patternUnlocked = isPatternUnlocked(pattern.pattern)
 
                           return (
                             <button
@@ -1021,6 +1022,8 @@ export default function Dashboard() {
                               className={`relative p-4 rounded-xl border-2 transition-all hover:scale-[1.02] text-left ${
                                 isSelected
                                   ? 'border-[var(--accent-purple)] bg-[#F3E5F5]'
+                                  : !patternUnlocked
+                                  ? 'border-[rgba(0,0,0,0.08)] bg-[rgba(0,0,0,0.02)] opacity-70'
                                   : 'border-[rgba(0,0,0,0.1)] bg-white hover:border-[var(--text-muted)]'
                               }`}
                             >
@@ -1039,7 +1042,12 @@ export default function Dashboard() {
                                 </div>
                               )}
 
-                              <h3 className="font-medium text-[var(--text-primary)] text-sm mb-1">
+                              <h3 className="font-medium text-[var(--text-primary)] text-sm mb-1 flex items-center gap-1">
+                                {!patternUnlocked && (
+                                  <svg className="w-3 h-3 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                  </svg>
+                                )}
                                 {pattern.pattern}. {pattern.name}
                               </h3>
                               <p className="text-xs text-[var(--text-muted)] mb-2">
@@ -1100,15 +1108,15 @@ export default function Dashboard() {
                   {/* Questions */}
                   <div className="space-y-2 max-h-[50vh] overflow-y-auto">
                     {selectedPattern.questions.map((question) => {
-                      const unlocked = isSDQuestionUnlocked(question.order)
+                      const unlocked = isPatternUnlocked(selectedPattern.pattern)
                       const completed = isSDQuestionCompleted(question.id)
                       const score = getSDQuestionScore(question.id)
 
                       return (
                         <button
                           key={question.id}
-                          onClick={() => handleStartSDPractice(question)}
-                          disabled={!unlocked && !isPro}
+                          onClick={() => handleStartSDPractice(question, selectedPattern.pattern)}
+                          disabled={!unlocked}
                           className={`w-full text-left p-3 rounded-xl border transition-colors ${
                             !unlocked
                               ? 'border-[rgba(0,0,0,0.08)] bg-[rgba(0,0,0,0.03)] cursor-not-allowed opacity-60'
