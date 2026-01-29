@@ -433,6 +433,11 @@ export async function evaluateSystemDesignInterview(
     // Note: Using Sonnet instead of Opus because Opus has JSON formatting issues via OpenRouter
     const { model = 'anthropic/claude-sonnet-4' } = options
 
+    // Log transcript stats before processing
+    const originalTranscriptLength = input.transcript?.length || 0
+    console.log(`[SD_EVALUATION] Starting evaluation for interview ${input.interviewId}`)
+    console.log(`[SD_EVALUATION] Transcript: ${originalTranscriptLength} messages`)
+
     const diagramSummary = summarizeDiagram(input.drawingData?.elements)
     const referenceSolutionText = formatReferenceSolutions(input.referenceSolutions)
     const hasReference = input.referenceSolutions?.solutions && input.referenceSolutions.solutions.length > 0
@@ -478,7 +483,7 @@ Spent: ${Math.floor(input.timeSpentSeconds / 60)}m ${input.timeSpentSeconds % 60
 
 Please provide detailed feedback on this candidate's system design interview, evaluating their STYLE and COMPLETENESS.`
 
-    console.log(`[SD_EVALUATION] Prompt size: system=${systemPrompt.length} chars, user=${userPrompt.length} chars, total=${systemPrompt.length + userPrompt.length} chars`)
+    console.log(`[SD_EVALUATION] Prompt size: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`)
     console.log(`[SD_EVALUATION] Calling LLM with model: ${model}`)
 
     const result = await llm.generateJSON<{
