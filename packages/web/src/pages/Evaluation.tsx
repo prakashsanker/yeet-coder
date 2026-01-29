@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
 import { API_URL, api } from '../lib/api'
 
@@ -114,6 +114,8 @@ interface EvaluationData {
   // System design snapshots
   evaluated_drawing?: { elements: unknown[] } | null
   evaluated_notes?: string | null
+  // Weak areas for quiz recommendations
+  weak_areas?: string[]
   created_at: string
   interview?: {
     id: string
@@ -831,6 +833,50 @@ function SystemDesignEvaluationDisplay({ evaluation, onRetry, isRetrying }: {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* PRACTICE SECTION - Quiz recommendations based on weak areas */}
+        {feedback.completeness?.gaps && feedback.completeness.gaps.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4 text-landing-primary flex items-center gap-2">
+              <span className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-white text-sm">4</span>
+              Strengthen Your Knowledge
+            </h2>
+            <p className="text-landing-muted mb-4">
+              Practice these concepts with AI-generated quizzes to reinforce your understanding.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {feedback.completeness.gaps.slice(0, 6).map((gap, index) => (
+                <Link
+                  key={index}
+                  to={`/dashboard?tab=practice`}
+                  className="p-4 rounded-xl border border-black/10 bg-white hover:border-teal-500 hover:bg-teal-50 transition-all group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-medium text-landing-primary group-hover:text-teal-700">
+                        {gap.topic}
+                      </h4>
+                      <p className="text-xs text-landing-muted mt-1">
+                        {gap.importance === 'critical' ? 'High priority' : gap.importance === 'important' ? 'Recommended' : 'Optional'}
+                      </p>
+                    </div>
+                    <svg className="w-5 h-5 text-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-4 text-center">
+              <Link
+                to="/dashboard?tab=practice"
+                className="text-teal-600 hover:text-teal-700 font-medium text-sm"
+              >
+                View all practice topics →
+              </Link>
             </div>
           </div>
         )}

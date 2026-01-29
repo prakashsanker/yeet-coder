@@ -164,6 +164,58 @@ export interface EndInterviewParams {
   time_spent_seconds: number
 }
 
+// Quiz types (defined before api object)
+export type QuizDifficulty = 'beginner' | 'intermediate' | 'advanced'
+export type QuizQuestionType = 'multiple_choice' | 'true_false' | 'scenario'
+
+export interface QuizQuestion {
+  id: string
+  question_order: number
+  question_text: string
+  question_type: QuizQuestionType
+  options: Array<{ text: string; is_correct: boolean }>
+  user_answer?: string | null
+  is_correct?: boolean | null
+  correct_answer?: string
+  explanation?: string
+  wrong_explanations?: Record<string, string>
+}
+
+export interface QuizSession {
+  id: string
+  topic: string
+  pattern_id?: number
+  difficulty: QuizDifficulty
+  question_type: QuizQuestionType
+  total_questions: number
+  correct_count: number
+  completed_at?: string
+  created_at: string
+  questions?: QuizQuestion[]
+}
+
+export interface QuizPerformance {
+  id: string
+  user_id: string
+  topic: string
+  total_questions: number
+  correct_count: number
+  last_practiced_at?: string
+}
+
+export interface WeakArea {
+  topic: string
+  count: number
+}
+
+export interface CreateQuizSessionParams {
+  topic: string
+  pattern_id?: number
+  difficulty: QuizDifficulty
+  question_type: QuizQuestionType
+  total_questions: number
+}
+
 export const api = {
   topics: {
     list: () => fetchApi<{ topics: Topic[] }>('/api/topics'),
@@ -278,6 +330,41 @@ export const api = {
         { method: 'POST' }
       ),
   },
+  quiz: {
+    createSession: (params: CreateQuizSessionParams) =>
+      fetchApi<{ success: boolean; session: QuizSession }>('/api/quiz/sessions', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+    getSession: (id: string) =>
+      fetchApi<{ success: boolean; session: QuizSession }>(`/api/quiz/sessions/${id}`),
+    listSessions: (params?: { limit?: number }) => {
+      const searchParams = new URLSearchParams()
+      if (params?.limit) searchParams.set('limit', params.limit.toString())
+      const query = searchParams.toString()
+      return fetchApi<{ success: boolean; sessions: QuizSession[] }>(
+        `/api/quiz/sessions${query ? `?${query}` : ''}`
+      )
+    },
+    submitAnswer: (sessionId: string, params: { question_id: string; answer: string }) =>
+      fetchApi<{
+        success: boolean
+        result: {
+          is_correct: boolean
+          correct_answer: string
+          explanation: string
+          wrong_explanations: Record<string, string>
+          session_completed: boolean
+        }
+      }>(`/api/quiz/sessions/${sessionId}/answer`, {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }),
+    getPerformance: () =>
+      fetchApi<{ success: boolean; performance: QuizPerformance[] }>('/api/quiz/performance'),
+    getWeakAreas: () =>
+      fetchApi<{ success: boolean; weak_areas: WeakArea[] }>('/api/quiz/weak-areas'),
+  },
 }
 
 export interface CreateEvaluationParams {
@@ -342,6 +429,8 @@ export interface Evaluation {
   // System design snapshots
   evaluated_drawing?: ExcalidrawData | null
   evaluated_notes?: string | null
+  // Weak areas for quiz recommendations
+  weak_areas?: string[]
   created_at: string
   // Joined data
   interview?: InterviewSession

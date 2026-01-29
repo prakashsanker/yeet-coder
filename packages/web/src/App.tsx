@@ -9,6 +9,7 @@ import SystemDesignInterview from './pages/SystemDesignInterview'
 import Evaluation from './pages/Evaluation'
 import GeneratingEvaluation from './pages/GeneratingEvaluation'
 import Subscription from './pages/Subscription'
+import Quiz from './pages/Quiz'
 import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
 import { analytics } from './lib/posthog'
@@ -79,6 +80,7 @@ function App() {
       <Route path="/evaluation/generating/:interviewId" element={<ProtectedRoute><GeneratingEvaluation /></ProtectedRoute>} />
       <Route path="/evaluation/:id" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
       <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+      <Route path="/quiz/:id" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
     </Routes>
   )
 }

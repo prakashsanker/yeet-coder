@@ -11,6 +11,7 @@ import interviewsRoutes from './routes/interviews.js'
 import evaluationsRoutes from './routes/evaluations.js'
 import stripeRoutes from './routes/stripe.js'
 import usersRoutes from './routes/users.js'
+import quizRoutes from './routes/quiz.js'
 import { setupWebSocket } from './websocket/index.js'
 
 const DEFAULT_PORT = parseInt(process.env.PORT || '3001', 10)
@@ -79,6 +80,7 @@ async function main() {
   app.use('/api/evaluations', evaluationsRoutes)
   app.use('/api/stripe', stripeRoutes)
   app.use('/api/users', usersRoutes)
+  app.use('/api/quiz', quizRoutes)
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`)

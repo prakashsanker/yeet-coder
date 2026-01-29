@@ -2,12 +2,12 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import AppHeader from '../components/common/AppHeader'
 import PaywallModal from '../components/common/PaywallModal'
-import { api, type Question, type Evaluation, type InterviewSession, type Topic } from '../lib/api'
+import { api, type Question, type Evaluation, type InterviewSession, type Topic, type WeakArea, type QuizPerformance, type QuizDifficulty, type QuizQuestionType } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../lib/admin'
 import { analytics } from '../lib/posthog'
 
-type Tab = 'neetcode' | 'system_design' | 'history'
+type Tab = 'neetcode' | 'system_design' | 'practice' | 'history'
 
 interface EvaluationWithInterview extends Evaluation {
   interview: InterviewSession
@@ -321,6 +321,17 @@ export default function Dashboard() {
   const [showPaywall, setShowPaywall] = useState(false)
   const [selectedPattern, setSelectedPattern] = useState<RoadmapPattern | null>(null)
 
+  // Quiz/Practice state
+  const [weakAreas, setWeakAreas] = useState<WeakArea[]>([])
+  const [quizPerformance, setQuizPerformance] = useState<QuizPerformance[]>([])
+  const [isLoadingPractice, setIsLoadingPractice] = useState(false)
+  const [showQuizConfig, setShowQuizConfig] = useState(false)
+  const [selectedQuizTopic, setSelectedQuizTopic] = useState<string | null>(null)
+  const [quizDifficulty, setQuizDifficulty] = useState<QuizDifficulty>('beginner')
+  const [quizQuestionType, setQuizQuestionType] = useState<QuizQuestionType>('multiple_choice')
+  const [quizQuestionCount, setQuizQuestionCount] = useState(5)
+  const [isCreatingQuiz, setIsCreatingQuiz] = useState(false)
+
   // Ensure non-admin users can't access neetcode tab
   // This handles race conditions where user loads after initial render
   useEffect(() => {
@@ -329,13 +340,19 @@ export default function Dashboard() {
     }
   }, [user, userIsAdmin, activeTab])
 
-  // Handle upgrade success query param
+  // Handle upgrade success query param and tab selection
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {
       analytics.upgradeSuccessful()
       setShowUpgradeSuccess(true)
       setSearchParams({}, { replace: true })
       setTimeout(() => setShowUpgradeSuccess(false), 5000)
+    }
+    // Handle tab query param
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'practice') {
+      setActiveTab('practice')
+      setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
 
@@ -375,6 +392,27 @@ export default function Dashboard() {
     }
     loadHistory()
   }, [user])
+
+  // Load practice data when practice tab is active
+  useEffect(() => {
+    async function loadPracticeData() {
+      if (!user || activeTab !== 'practice') return
+      setIsLoadingPractice(true)
+      try {
+        const [weakAreasRes, performanceRes] = await Promise.all([
+          api.quiz.getWeakAreas(),
+          api.quiz.getPerformance(),
+        ])
+        setWeakAreas(weakAreasRes.weak_areas)
+        setQuizPerformance(performanceRes.performance)
+      } catch (err) {
+        console.error('Failed to load practice data:', err)
+      } finally {
+        setIsLoadingPractice(false)
+      }
+    }
+    loadPracticeData()
+  }, [user, activeTab])
 
   useEffect(() => {
     async function loadRoadmapData() {
@@ -572,6 +610,39 @@ export default function Dashboard() {
     ).length
   }
 
+  // Quiz handlers
+  const handleStartQuiz = (topic: string) => {
+    setSelectedQuizTopic(topic)
+    setShowQuizConfig(true)
+  }
+
+  const handleCreateQuiz = async () => {
+    if (!selectedQuizTopic || isCreatingQuiz) return
+
+    setIsCreatingQuiz(true)
+    try {
+      const { session } = await api.quiz.createSession({
+        topic: selectedQuizTopic,
+        difficulty: quizDifficulty,
+        question_type: quizQuestionType,
+        total_questions: quizQuestionCount,
+      })
+      setShowQuizConfig(false)
+      navigate(`/quiz/${session.id}`)
+    } catch (err) {
+      console.error('Failed to create quiz:', err)
+      alert('Failed to create quiz. Please try again.')
+    } finally {
+      setIsCreatingQuiz(false)
+    }
+  }
+
+  const getTopicAccuracy = (topic: string) => {
+    const perf = quizPerformance.find(p => p.topic === topic)
+    if (!perf || perf.total_questions === 0) return null
+    return Math.round((perf.correct_count / perf.total_questions) * 100)
+  }
+
   return (
     <div className="app-page">
       <AppHeader />
@@ -671,6 +742,14 @@ export default function Dashboard() {
             </span>
           </button>
           <button
+            onClick={() => setActiveTab('practice')}
+            className={`tab ${activeTab === 'practice' ? 'tab-active' : ''}`}
+          >
+            <span className="flex items-center gap-2">
+              Practice
+            </span>
+          </button>
+          <button
             onClick={() => setActiveTab('history')}
             className={`tab ${activeTab === 'history' ? 'tab-active' : ''}`}
           >
@@ -689,6 +768,7 @@ export default function Dashboard() {
         <p className="text-[var(--text-muted)] text-sm mb-6">
           {activeTab === 'system_design' && 'Resources to prepare for system design interviews. Practice designing scalable systems.'}
           {activeTab === 'neetcode' && userIsAdmin && 'The NeetCode 150 - a curated list of the most important LeetCode problems.'}
+          {activeTab === 'practice' && 'Strengthen your knowledge with AI-generated quizzes based on concepts you need to improve.'}
           {activeTab === 'history' && 'Your past interview submissions and evaluations.'}
         </p>
 
@@ -767,6 +847,171 @@ export default function Dashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'practice' ? (
+          // Practice tab - Quiz and weak areas
+          <div>
+            {isLoadingPractice ? (
+              <div className="text-center py-12">
+                <div className="spinner w-8 h-8 mx-auto mb-4"></div>
+                <p className="text-[var(--text-muted)]">Loading practice data...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Weak Areas from Evaluations */}
+                {weakAreas.length > 0 && (
+                  <div className="card p-6">
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+                      Recommended Practice
+                    </h2>
+                    <p className="text-[var(--text-muted)] text-sm mb-4">
+                      Based on your recent interviews, focus on these concepts:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {weakAreas.map((area) => {
+                        const accuracy = getTopicAccuracy(area.topic)
+                        return (
+                          <button
+                            key={area.topic}
+                            onClick={() => handleStartQuiz(area.topic)}
+                            className="text-left p-4 rounded-xl border border-[rgba(0,0,0,0.1)] bg-white hover:border-[var(--accent-purple)] hover:bg-[#F3E5F5] transition-all"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-medium text-[var(--text-primary)] capitalize">
+                                  {area.topic.replace(/-/g, ' ')}
+                                </h3>
+                                <p className="text-xs text-[var(--text-muted)] mt-1">
+                                  Appeared in {area.count} evaluation{area.count > 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              {accuracy !== null && (
+                                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                                  accuracy >= 80 ? 'bg-[#E8F5E9] text-[#2E7D32]' :
+                                  accuracy >= 50 ? 'bg-[#FFF8E1] text-[#F57C00]' :
+                                  'bg-[#FFEBEE] text-[#C62828]'
+                                }`}>
+                                  {accuracy}%
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Browse All Topics */}
+                <div className="card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+                    Browse Topics
+                  </h2>
+                  <p className="text-[var(--text-muted)] text-sm mb-4">
+                    Practice any system design concept
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {Object.entries({
+                      'Caching': 'caching',
+                      'Rate Limiting': 'rate-limiting',
+                      'Message Queues': 'message-queues',
+                      'Database Sharding': 'database',
+                      'CAP Theorem': 'cap-theorem',
+                      'Consistent Hashing': 'hashing',
+                      'Load Balancing': 'scalability',
+                      'Real-time Systems': 'real-time',
+                      'Search & Indexing': 'search',
+                      'Event Streaming': 'event-streaming',
+                      'Blob Storage': 'blob-storage',
+                      'Authentication': 'authentication',
+                    }).map(([label, topic]) => {
+                      const accuracy = getTopicAccuracy(topic)
+                      return (
+                        <button
+                          key={topic}
+                          onClick={() => handleStartQuiz(topic)}
+                          className="text-left p-3 rounded-xl border border-[rgba(0,0,0,0.1)] bg-white hover:border-[var(--accent-purple)] hover:bg-[#F3E5F5] transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-[var(--text-primary)]">{label}</span>
+                            {accuracy !== null && (
+                              <span className={`text-xs font-medium ${
+                                accuracy >= 80 ? 'text-[#2E7D32]' :
+                                accuracy >= 50 ? 'text-[#F57C00]' :
+                                'text-[#C62828]'
+                              }`}>
+                                {accuracy}%
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Quiz History */}
+                {quizPerformance.length > 0 && (
+                  <div className="card p-6">
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
+                      Your Progress
+                    </h2>
+                    <div className="space-y-3">
+                      {quizPerformance.slice(0, 5).map((perf) => (
+                        <div key={perf.id} className="flex items-center justify-between p-3 bg-[var(--bg-section)] rounded-lg">
+                          <div>
+                            <span className="text-[var(--text-primary)] capitalize">
+                              {perf.topic.replace(/-/g, ' ')}
+                            </span>
+                            <span className="text-xs text-[var(--text-muted)] ml-2">
+                              {perf.total_questions} questions
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 h-2 bg-[rgba(0,0,0,0.1)] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${
+                                  (perf.correct_count / perf.total_questions) >= 0.8 ? 'bg-[#4CAF50]' :
+                                  (perf.correct_count / perf.total_questions) >= 0.5 ? 'bg-[#FFC107]' :
+                                  'bg-[#F44336]'
+                                }`}
+                                style={{ width: `${(perf.correct_count / perf.total_questions) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium text-[var(--text-primary)] w-12 text-right">
+                              {Math.round((perf.correct_count / perf.total_questions) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {weakAreas.length === 0 && quizPerformance.length === 0 && (
+                  <div className="text-center py-12 card p-8">
+                    <div className="w-12 h-12 bg-[var(--bg-section)] rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-6 h-6 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">
+                      Complete an interview to get started
+                    </h3>
+                    <p className="text-[var(--text-muted)] mb-4">
+                      After your first evaluation, we'll recommend topics to practice based on areas you need to improve.
+                    </p>
+                    <button
+                      onClick={() => navigate('/onboarding')}
+                      className="btn-primary"
+                    >
+                      Start an Interview
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1192,6 +1437,127 @@ export default function Dashboard() {
         onClose={() => setShowPaywall(false)}
         existingInterview={subscription?.existingInterview || null}
       />
+
+      {/* Quiz Configuration Modal */}
+      {showQuizConfig && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                Configure Quiz
+              </h2>
+              <button
+                onClick={() => setShowQuizConfig(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-[var(--text-muted)] mb-6">
+              Practice: <span className="font-medium text-[var(--text-primary)] capitalize">
+                {selectedQuizTopic?.replace(/-/g, ' ')}
+              </span>
+            </p>
+
+            {/* Difficulty */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                Difficulty
+              </label>
+              <div className="flex gap-2">
+                {(['beginner', 'intermediate', 'advanced'] as const).map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setQuizDifficulty(level)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                      quizDifficulty === level
+                        ? 'bg-[var(--accent-purple)] text-white'
+                        : 'bg-[var(--bg-section)] text-[var(--text-secondary)] hover:bg-[rgba(0,0,0,0.08)]'
+                    }`}
+                  >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Question Type */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                Question Type
+              </label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'multiple_choice', label: 'Multiple Choice' },
+                  { value: 'true_false', label: 'True/False' },
+                  { value: 'scenario', label: 'Scenario' },
+                ] as const).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setQuizQuestionType(value)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                      quizQuestionType === value
+                        ? 'bg-[var(--accent-purple)] text-white'
+                        : 'bg-[var(--bg-section)] text-[var(--text-secondary)] hover:bg-[rgba(0,0,0,0.08)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Question Count */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                Number of Questions
+              </label>
+              <div className="flex gap-2">
+                {[5, 10, 15].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => setQuizQuestionCount(count)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                      quizQuestionCount === count
+                        ? 'bg-[var(--accent-purple)] text-white'
+                        : 'bg-[var(--bg-section)] text-[var(--text-secondary)] hover:bg-[rgba(0,0,0,0.08)]'
+                    }`}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowQuizConfig(false)}
+                className="flex-1 py-2.5 px-4 rounded-lg text-[var(--text-secondary)] bg-[var(--bg-section)] hover:bg-[rgba(0,0,0,0.08)] transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateQuiz}
+                disabled={isCreatingQuiz}
+                className="flex-1 btn-primary disabled:opacity-50"
+              >
+                {isCreatingQuiz ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="spinner w-4 h-4"></div>
+                    Creating...
+                  </span>
+                ) : (
+                  'Start Quiz'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

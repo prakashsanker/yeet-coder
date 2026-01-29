@@ -201,6 +201,8 @@ export interface Evaluation {
   // System design snapshots
   evaluated_drawing?: ExcalidrawData | null
   evaluated_notes?: string | null
+  // Weak areas detected during evaluation (for quiz recommendations)
+  weak_areas?: string[]
   created_at: string
 }
 

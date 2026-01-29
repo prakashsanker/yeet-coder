@@ -135,6 +135,8 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
           feedback: sdResult.feedback,
           evaluated_drawing: interview.drawing_data,
           evaluated_notes: interview.notes,
+          // Weak areas for quiz recommendations
+          weak_areas: sdResult.weak_areas,
         })
       } catch (evalError) {
         console.error('[EVALUATION] System design evaluation failed:', evalError)
@@ -303,6 +305,7 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
           feedback: sdResult.feedback,
           evaluated_drawing: interview?.drawing_data,
           evaluated_notes: interview?.notes,
+          weak_areas: sdResult.weak_areas,
         }
       } catch (evalError) {
         console.error('[EVALUATION] System design re-run failed:', evalError)
