@@ -97,16 +97,6 @@ export default function AppHeader({ showBack, onBack, children, rightContent, hi
                 >
                   Dashboard
                 </button>
-                <button
-                  onClick={() => navigate('/roadmap')}
-                  className={`text-sm font-medium transition-colors ${
-                    isActive('/roadmap')
-                      ? 'text-[var(--text-primary)]'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  Roadmap
-                </button>
               </nav>
               <div className="relative" ref={dropdownRef}>
                 <button

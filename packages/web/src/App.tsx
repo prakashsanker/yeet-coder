@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import Landing from './pages/Landing'
 import Compare from './pages/Compare'
 import Dashboard from './pages/Dashboard'
-import Roadmap from './pages/Roadmap'
 import Onboarding from './pages/Onboarding'
 import Interview from './pages/Interview'
 import SystemDesignInterview from './pages/SystemDesignInterview'
@@ -74,8 +73,7 @@ function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       {/* Protected routes */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
-      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+            <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/interview/:id" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
       <Route path="/system-design/:id" element={<ProtectedRoute><SystemDesignInterview /></ProtectedRoute>} />
       <Route path="/evaluation/generating/:interviewId" element={<ProtectedRoute><GeneratingEvaluation /></ProtectedRoute>} />
