@@ -7,6 +7,7 @@ import Onboarding from './pages/Onboarding'
 import Interview from './pages/Interview'
 import SystemDesignInterview from './pages/SystemDesignInterview'
 import Evaluation from './pages/Evaluation'
+import ExampleEvaluation from './pages/ExampleEvaluation'
 import GeneratingEvaluation from './pages/GeneratingEvaluation'
 import Subscription from './pages/Subscription'
 import Quiz from './pages/Quiz'
@@ -71,6 +72,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/compare" element={<Compare />} />
+      <Route path="/example" element={<ExampleEvaluation />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       {/* Protected routes */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -78,7 +80,8 @@ function App() {
       <Route path="/interview/:id" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
       <Route path="/system-design/:id" element={<ProtectedRoute><SystemDesignInterview /></ProtectedRoute>} />
       <Route path="/evaluation/generating/:interviewId" element={<ProtectedRoute><GeneratingEvaluation /></ProtectedRoute>} />
-      <Route path="/evaluation/:id" element={<ProtectedRoute><Evaluation /></ProtectedRoute>} />
+      {/* Evaluation view is public so we can share example evaluations on landing page */}
+      <Route path="/evaluation/:id" element={<Evaluation />} />
       <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
       <Route path="/quiz/:id" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
     </Routes>

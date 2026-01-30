@@ -19,6 +19,17 @@ import {
   formatContextForInstructions,
   getTokenStats,
 } from '../services/conversationContext.js'
+import {
+  createEmptyStructuredMemory,
+  addToStructuredMemory,
+  classifyQuery,
+  retrieveRelevantContext,
+  migrateToStructuredMemory,
+  getMemoryStats,
+} from '../services/structuredMemory.js'
+
+// Feature flag for structured memory
+const USE_STRUCTURED_MEMORY = process.env.USE_STRUCTURED_MEMORY !== 'false' // Default to true
 
 export interface RealtimeVoiceSession {
   realtimeClient: OpenAIRealtimeClient
@@ -172,6 +183,21 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
   const interviewMeta = await fetchInterviewMetadata(ws.interviewId)
   console.log(`[RealtimeHandler] Interview type: ${interviewMeta.interviewType}, problem: ${interviewMeta.problemTitle || 'N/A'}`)
 
+  // Store interview type on WebSocket for routing
+  ws.interviewType = interviewMeta.interviewType
+
+  // Initialize structured memory for system design interviews
+  if (USE_STRUCTURED_MEMORY && interviewMeta.interviewType === 'system_design') {
+    console.log(`[RealtimeHandler] Initializing structured memory for system design interview`)
+    ws.structuredMemory = createEmptyStructuredMemory()
+
+    // Migrate existing history if reconnecting
+    if (ws.conversationHistory && ws.conversationHistory.length > 0) {
+      console.log(`[RealtimeHandler] Migrating ${ws.conversationHistory.length} existing messages to structured memory`)
+      await migrateToStructuredMemory(ws.structuredMemory, ws.conversationHistory)
+    }
+  }
+
   // Get stored context from the WebSocket object
   const storedContext = ws.interviewContext || { currentQuestion: '', userCode: '' }
   console.log(`[RealtimeHandler] Using stored context - question length: ${storedContext.currentQuestion.length}, code length: ${storedContext.userCode.length}`)
@@ -233,7 +259,7 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
         sendMessage(ws, { type: 'voice_ready' })
       },
 
-      onInputAudioTranscription: (transcript) => {
+      onInputAudioTranscription: async (transcript) => {
         // Send user's transcribed speech to client
         console.log(`[RealtimeHandler] User said: ${transcript}`)
         sendMessage(ws, {
@@ -243,6 +269,11 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
         })
         // Add to conversation history
         addToConversationHistory(ws, 'user', transcript)
+
+        // Add to structured memory for system design interviews
+        if (ws.structuredMemory) {
+          await addToStructuredMemory(ws.structuredMemory, 'user', transcript)
+        }
       },
 
       onResponseAudioDelta: (delta, _itemId) => {
@@ -260,11 +291,16 @@ async function startRealtimeSession(ws: InterviewWebSocket): Promise<void> {
         }
       },
 
-      onResponseTextDone: (text, _itemId) => {
+      onResponseTextDone: async (text, _itemId) => {
         console.log(`[RealtimeHandler] AI response: ${text}`)
 
         // Add to conversation history
         addToConversationHistory(ws, 'interviewer', text)
+
+        // Add to structured memory for system design interviews
+        if (ws.structuredMemory) {
+          await addToStructuredMemory(ws.structuredMemory, 'interviewer', text)
+        }
 
         // Send complete response to client
         // Include accumulated audio if available
@@ -506,7 +542,32 @@ export function updateRealtimeContext(
  * Called periodically as the conversation grows
  */
 async function maybeUpdateConversationContext(ws: InterviewWebSocket): Promise<void> {
-  if (!ws.conversationHistory || !ws.realtimeSession?.realtimeClient) {
+  if (!ws.realtimeSession?.realtimeClient) {
+    return
+  }
+
+  // For system design interviews with structured memory, use selective retrieval
+  if (ws.structuredMemory && ws.interviewType === 'system_design') {
+    const stats = getMemoryStats(ws.structuredMemory)
+    console.log(`[RealtimeHandler] Structured memory stats: ${stats.totalTokens} tokens, topics: ${JSON.stringify(stats.topicCounts)}`)
+
+    // Get the last user message to classify the query
+    const lastUserMessage = ws.structuredMemory.recentMessages
+      .filter(m => m.speaker === 'user')
+      .slice(-1)[0]
+
+    if (lastUserMessage) {
+      const classification = await classifyQuery(lastUserMessage.text)
+      const context = retrieveRelevantContext(ws.structuredMemory, classification)
+
+      ws.realtimeSession.realtimeClient.updateConversationContext(context)
+      console.log(`[RealtimeHandler] Updated context using structured retrieval (topic: ${classification.primaryTopic})`)
+    }
+    return
+  }
+
+  // Fallback: original compaction-based approach for coding interviews
+  if (!ws.conversationHistory) {
     return
   }
 
