@@ -1,3 +1,14 @@
+// Google-style candidate levels
+export type CandidateLevel = 'L4' | 'L5' | 'L6'
+
+// Google-style hiring ratings
+export type GoogleHiringRating =
+  | 'strong_hire'
+  | 'hire'
+  | 'leaning_hire'
+  | 'leaning_no_hire'
+  | 'no_hire'
+
 export interface Topic {
   id: string
   name: string
@@ -36,6 +47,7 @@ export interface InterviewSession {
   // System design specific fields
   drawing_data?: ExcalidrawData | null
   notes?: string | null
+  target_level?: CandidateLevel // Target level for evaluation (L4/L5/L6)
   // Joined data (populated when fetching)
   question?: Question
 }
@@ -192,6 +204,9 @@ export interface Evaluation {
   // Qualitative ratings (new approach)
   style_rating?: 'strong' | 'adequate' | 'needs_improvement'
   completeness_rating?: 'comprehensive' | 'adequate' | 'incomplete'
+  // Google hiring rating
+  hiring_rating?: GoogleHiringRating
+  target_level?: CandidateLevel
   // Common fields
   overall_score?: number
   verdict?: 'PASS' | 'FAIL'
@@ -215,6 +230,33 @@ export interface EvaluationFeedback {
 
 // System design interview feedback - focused on Style and Completeness
 export interface SystemDesignFeedback {
+  // === HIRING RATING (displayed at top) ===
+  hiring_rating?: GoogleHiringRating
+  hiring_rating_rationale?: string
+  evaluated_at_level?: CandidateLevel
+
+  // === INTERVIEW STYLE BREAKDOWN ===
+  interview_style?: {
+    // Structure: FR → NFR (with numbers) → HLD → LLD
+    structure_followed: boolean
+    structure_assessment: string
+    // Time Management: 5-7 min requirements, rest for design
+    time_management: 'good' | 'adequate' | 'poor'
+    time_management_notes: string
+    // Communication: collaborative vs monologue
+    communication_style: 'collaborative' | 'monologue' | 'needs_prompting'
+    communication_notes: string
+  }
+
+  // === NUMBERS USAGE TRACKING ===
+  numbers_usage?: {
+    numbers_mentioned: string[]
+    numbers_used_in_design: string[]
+    numbers_not_used: string[]
+    violated_rule: boolean
+    violation_details?: string
+  }
+
   // === STYLE ASSESSMENT ===
   // How they approached the problem: clarity, structure, diagrams, trade-off consideration
   style: {

@@ -11,7 +11,8 @@ const router = Router()
 const createInterviewSchema = z.object({
   question_id: z.string().uuid(),
   language: z.string().default('python'),
-  time_limit_seconds: z.number().optional().default(3600),
+  time_limit_seconds: z.number().optional(), // Default set dynamically based on session type
+  target_level: z.enum(['L4', 'L5', 'L6']).optional(), // Google-style level for system design
 })
 
 const updateInterviewSchema = z.object({
@@ -48,7 +49,7 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
       })
     }
 
-    const { question_id, language, time_limit_seconds } = parseResult.data
+    const { question_id, language, time_limit_seconds, target_level } = parseResult.data
 
     // Fetch the question to get topic_id and validate it exists
     const { data: question, error: questionError } = await supabase
@@ -134,6 +135,9 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
       }
     }
 
+    // Default time limits: 45 min for system design, 60 min for coding
+    const defaultTimeLimit = session_type === 'system_design' ? 2700 : 3600
+
     const { data: interview, error } = await supabase
       .from('interview_sessions')
       .insert({
@@ -142,7 +146,8 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
         question_id,
         session_type,
         language: session_type === 'coding' ? language : null,
-        time_limit_seconds,
+        time_limit_seconds: time_limit_seconds || defaultTimeLimit,
+        target_level: session_type === 'system_design' ? (target_level || 'L5') : null,
         status: 'in_progress',
         run_count: 0,
         submit_count: 0,

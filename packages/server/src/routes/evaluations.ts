@@ -110,13 +110,17 @@ router.post('/', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: 
         transcript: (interview.transcript || []) as TranscriptEntry[],
         timeSpentSeconds: interview.time_spent_seconds || 0,
         timeLimitSeconds: interview.time_limit_seconds || 3600,
+        targetLevel: interview.target_level as 'L4' | 'L5' | 'L6' | undefined,
       }
 
       try {
         const sdResult = await systemDesignEvaluationService.evaluate(sdEvalInput)
-        console.log(`[EVALUATION] System design evaluation completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}`)
+        console.log(`[EVALUATION] System design evaluation completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}, hiring=${sdResult.hiring_rating}`)
 
         Object.assign(evaluationData, {
+          // Google hiring rating
+          hiring_rating: sdResult.hiring_rating,
+          target_level: sdResult.target_level,
           // New qualitative ratings
           style_rating: sdResult.style_rating,
           completeness_rating: sdResult.completeness_rating,
@@ -252,6 +256,7 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
       submit_count?: number
       drawing_data?: ExcalidrawData | null
       notes?: string | null
+      target_level?: 'L4' | 'L5' | 'L6'
       question?: Question
     }
 
@@ -282,13 +287,16 @@ router.post('/:id/rerun', optionalAuthMiddleware, async (req: AuthenticatedReque
         transcript: (interview?.transcript || []) as TranscriptEntry[],
         timeSpentSeconds: interview?.time_spent_seconds || 0,
         timeLimitSeconds: interview?.time_limit_seconds || 3600,
+        targetLevel: interview?.target_level,
       }
 
       try {
         const sdResult = await systemDesignEvaluationService.evaluate(sdEvalInput)
-        console.log(`[EVALUATION] System design re-run completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}`)
+        console.log(`[EVALUATION] System design re-run completed: style=${sdResult.style_rating}, completeness=${sdResult.completeness_rating}, hiring=${sdResult.hiring_rating}`)
 
         updateData = {
+          hiring_rating: sdResult.hiring_rating,
+          target_level: sdResult.target_level,
           style_rating: sdResult.style_rating,
           completeness_rating: sdResult.completeness_rating,
           clarity_score: sdResult.clarity_score,
