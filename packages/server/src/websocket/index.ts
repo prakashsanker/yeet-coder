@@ -7,6 +7,7 @@ import {
   updateRealtimeContext,
   type RealtimeVoiceSession,
 } from './realtimeVoiceHandler.js'
+import type { StructuredConversationMemory } from '../services/structuredMemory.js'
 
 // Voice mode configuration
 // 'realtime' = OpenAI Realtime API (low-latency, speech-to-speech)
@@ -37,6 +38,10 @@ export interface InterviewWebSocket extends WebSocket {
   introductionGiven?: string
   // Conversation history for context continuity
   conversationHistory?: TranscriptEntry[]
+  // Structured memory for system design interviews (topic-based context)
+  structuredMemory?: StructuredConversationMemory
+  // Interview type for routing
+  interviewType?: 'coding' | 'system_design'
 }
 
 export type WebSocketMessage =

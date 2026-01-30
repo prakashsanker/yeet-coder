@@ -42,9 +42,14 @@ export interface SystemDesignEvaluationInput {
   transcript: TranscriptEntry[]
   timeSpentSeconds: number
   timeLimitSeconds: number
+  targetLevel?: 'L4' | 'L5' | 'L6' // Google-style level for calibration
 }
 
 export interface SystemDesignEvaluationResult {
+  // Google hiring rating
+  hiring_rating: 'strong_hire' | 'hire' | 'leaning_hire' | 'leaning_no_hire' | 'no_hire'
+  target_level: 'L4' | 'L5' | 'L6'
+
   // Style and Completeness ratings
   style_rating: 'strong' | 'adequate' | 'needs_improvement'
   completeness_rating: 'comprehensive' | 'adequate' | 'incomplete'
@@ -196,7 +201,7 @@ function formatReferenceSolutions(solutions?: SystemDesignReferenceSolutions): s
 
 // Build the evaluation prompt by combining the persona's grading philosophy
 // with the specific output format requirements
-function buildSystemDesignEvaluationPrompt(referenceSolutionText?: string): string {
+function buildSystemDesignEvaluationPrompt(referenceSolutionText?: string, targetLevel: 'L4' | 'L5' | 'L6' = 'L5'): string {
   // Start with the persona's evaluation instructions (the "who" and "how")
   const personaInstructions = buildEvaluationInstructions(
     SYSTEM_DESIGN_PERSONA,
@@ -287,6 +292,105 @@ The "gaps" array is the MOST IMPORTANT part of your evaluation. For EVERY major 
 
 The goal is to show the candidate EXACTLY what they should have said, not just tell them they missed something.
 
+## GOOGLE HIRING RATING (REQUIRED)
+
+You are evaluating this candidate at level: **${targetLevel}**
+
+The same performance means DIFFERENT ratings at different levels. A "Strong Hire at L4" might be "Leaning Hire at L5" or "No Hire at L6".
+
+### Level Expectations:
+
+**L4 (Entry-level SWE):**
+- Can solve with guidance, some gaps OK
+- Should cover basic requirements with some prompting OK
+- Capacity estimates with guidance is acceptable
+- Missing some topics is OK if core design is sound
+
+**L5 (Senior SWE):**
+- Must drive independently, 70%+ coverage expected
+- Must do capacity estimates with MINIMAL prompting
+- Should cover most answer key topics with good depth
+- Must explain trade-offs for major decisions
+- Some guidance OK, but should mostly self-direct
+
+**L6 (Staff SWE):**
+- Must fully self-direct with expert-level depth, 85%+ coverage
+- Must proactively identify ALL critical requirements
+- Must do thorough capacity estimates without ANY prompting
+- Should anticipate edge cases and failure modes
+- Should discuss production readiness concerns
+
+### Rating Definitions:
+
+- **strong_hire**: Exceptional. Exceeded expectations for ${targetLevel}. Would enthusiastically advocate for hiring.
+- **hire**: Solid. Met all expectations for ${targetLevel}. Confident they can do the job.
+- **leaning_hire**: Good with minor gaps. Met most expectations. Would support with slight reservations.
+- **leaning_no_hire**: Below expectations. Significant gaps for ${targetLevel}. Have concerns.
+- **no_hire**: Did not meet minimum bar for ${targetLevel}. Would not recommend.
+
+### Level Calibration Matrix:
+
+| Performance | L4 Rating | L5 Rating | L6 Rating |
+|-------------|-----------|-----------|-----------|
+| 80%+, self-directed | Strong Hire | Hire | Leaning Hire |
+| 60-80%, some guidance | Hire | Leaning Hire | Leaning No Hire |
+| 40-60%, needs guidance | Leaning Hire | Leaning No Hire | No Hire |
+| <40%, significant gaps | Leaning No Hire | No Hire | No Hire |
+
+### Automatic Downgrades:
+- If numbers mentioned but not used → Drop 1 rating level
+- If requirements skipped entirely → Cannot be above "Leaning No Hire"
+- If monologue style (no collaboration) → Cannot be "Strong Hire"
+- If ran out of time before core design → Drop 1 rating level
+
+## INTERVIEW STYLE BREAKDOWN
+
+Evaluate their interview style on these specific dimensions:
+
+### Structure (FR → NFR → HLD → LLD)
+Did they follow the expected structure?
+- Functional requirements FIRST
+- Non-functional requirements with SPECIFIC NUMBERS (QPS, storage, latency)
+- High-level design showing major components
+- Low-level design with implementation details
+- Build functional first, then add fault tolerance/scale
+
+### Time Management (45 minutes total)
+- 5-7 minutes on requirements gathering (no more!)
+- Remaining time on design
+- Did they pace appropriately or run out of time?
+
+### Communication Style
+- Was it collaborative or a monologue?
+- Did they give the interviewer chances to talk/contribute?
+- Did they ask for feedback during design?
+
+## NUMBERS USAGE RULE (CRITICAL - HARD REQUIREMENT)
+
+If the candidate mentioned ANY numbers (QPS, storage, users, latency, etc.), they MUST USE those numbers in their design decisions.
+
+Search the transcript for numbers they mentioned:
+- User counts, DAU/MAU
+- QPS or requests per second
+- Storage sizes (KB, MB, GB, TB)
+- Latency requirements (ms)
+- Availability percentages
+
+Then check: Did they USE those numbers to make design decisions?
+
+Examples of violations:
+- Said "100M users" but never used it to calculate QPS
+- Said "1KB per message" but never calculated storage
+- Said "100ms latency requirement" but never discussed how to achieve it
+
+If they mentioned numbers but did NOT use them → This is a DING. Call it out specifically.
+
+Quote the numbers they mentioned and whether they used them:
+- "You said 100M users but never calculated QPS from this"
+- "You mentioned 1KB messages but didn't estimate storage needs"
+
+This is a HARD FAIL indicator if they cite numbers without using them.
+
 ## OUTPUT FORMAT
 
 CRITICAL: Your response MUST be a valid JSON object and nothing else. Do NOT include any text, explanations, code blocks, or SQL before or after the JSON. Start your response with { and end with }.
@@ -294,6 +398,27 @@ CRITICAL: Your response MUST be a valid JSON object and nothing else. Do NOT inc
 Return valid JSON:
 
 {
+  "hiring_rating": "strong_hire" | "hire" | "leaning_hire" | "leaning_no_hire" | "no_hire",
+  "hiring_rating_rationale": "<2-3 sentences explaining why this rating at ${targetLevel} level>",
+  "evaluated_at_level": "${targetLevel}",
+
+  "interview_style": {
+    "structure_followed": true | false,
+    "structure_assessment": "<Did they follow FR→NFR→HLD→LLD? What did they miss?>",
+    "time_management": "good" | "adequate" | "poor",
+    "time_management_notes": "<How did they use the 45 minutes?>",
+    "communication_style": "collaborative" | "monologue" | "needs_prompting",
+    "communication_notes": "<Did they give interviewer chances to contribute?>"
+  },
+
+  "numbers_usage": {
+    "numbers_mentioned": ["<list of numbers/estimates they said>"],
+    "numbers_used_in_design": ["<which ones they actually used in decisions>"],
+    "numbers_not_used": ["<which ones they cited but never used>"],
+    "violated_rule": true | false,
+    "violation_details": "<specific callout if they mentioned numbers but didn't use them, or null>"
+  },
+
   "style": {
     "rating": "strong" | "adequate" | "needs_improvement",
     "assessment": "<2-3 paragraph assessment - be harsh if they needed prompting or skipped structure>",
@@ -387,8 +512,12 @@ export async function evaluateSystemDesignInterview(
   input: SystemDesignEvaluationInput,
   options: { model?: LLMModel } = {}
 ): Promise<SystemDesignEvaluationResult> {
+  const targetLevel = input.targetLevel || 'L5'
+
   // Helper function to create fallback evaluation
   const createFallbackEvaluation = (hasContent: boolean): SystemDesignEvaluationResult => ({
+    hiring_rating: 'leaning_no_hire',
+    target_level: targetLevel,
     style_rating: 'adequate',
     completeness_rating: 'adequate',
     clarity_score: 50,
@@ -404,6 +533,23 @@ export async function evaluateSystemDesignInterview(
     overall_score: 50,
     weak_areas: [],
     feedback: {
+      hiring_rating: 'leaning_no_hire',
+      hiring_rating_rationale: 'Unable to evaluate due to an error.',
+      evaluated_at_level: targetLevel,
+      interview_style: {
+        structure_followed: false,
+        structure_assessment: 'Unable to assess.',
+        time_management: 'adequate',
+        time_management_notes: 'Unable to assess.',
+        communication_style: 'needs_prompting',
+        communication_notes: 'Unable to assess.',
+      },
+      numbers_usage: {
+        numbers_mentioned: [],
+        numbers_used_in_design: [],
+        numbers_not_used: [],
+        violated_rule: false,
+      },
       style: {
         rating: 'adequate',
         assessment: 'Unable to generate detailed feedback due to an error.',
@@ -454,7 +600,8 @@ export async function evaluateSystemDesignInterview(
 
     // Build the system prompt with persona and reference solution
     const systemPrompt = buildSystemDesignEvaluationPrompt(
-      hasReference ? referenceSolutionText : undefined
+      hasReference ? referenceSolutionText : undefined,
+      targetLevel
     )
 
     const userPrompt = `## QUESTION
@@ -497,6 +644,30 @@ Please provide detailed feedback on this candidate's system design interview, ev
     console.log(`[SD_EVALUATION] Calling LLM with model: ${model}`)
 
     const result = await llm.generateJSON<{
+      // Hiring rating (displayed at top)
+      hiring_rating: 'strong_hire' | 'hire' | 'leaning_hire' | 'leaning_no_hire' | 'no_hire'
+      hiring_rating_rationale: string
+      evaluated_at_level: 'L4' | 'L5' | 'L6'
+
+      // Interview style breakdown
+      interview_style: {
+        structure_followed: boolean
+        structure_assessment: string
+        time_management: 'good' | 'adequate' | 'poor'
+        time_management_notes: string
+        communication_style: 'collaborative' | 'monologue' | 'needs_prompting'
+        communication_notes: string
+      }
+
+      // Numbers usage tracking
+      numbers_usage: {
+        numbers_mentioned: string[]
+        numbers_used_in_design: string[]
+        numbers_not_used: string[]
+        violated_rule: boolean
+        violation_details?: string
+      }
+
       style: SystemDesignFeedback['style'] & {
         requirements_gathering?: 'thorough' | 'partial' | 'skipped'
         functional_requirements_covered?: boolean
@@ -539,6 +710,30 @@ Please provide detailed feedback on this candidate's system design interview, ev
     }
 
     const feedback: SystemDesignFeedback = {
+      // Hiring rating (displayed at top)
+      hiring_rating: result.hiring_rating || 'leaning_no_hire',
+      hiring_rating_rationale: result.hiring_rating_rationale || '',
+      evaluated_at_level: result.evaluated_at_level || targetLevel,
+
+      // Interview style breakdown
+      interview_style: result.interview_style ? {
+        structure_followed: result.interview_style.structure_followed ?? false,
+        structure_assessment: result.interview_style.structure_assessment || '',
+        time_management: result.interview_style.time_management || 'adequate',
+        time_management_notes: result.interview_style.time_management_notes || '',
+        communication_style: result.interview_style.communication_style || 'needs_prompting',
+        communication_notes: result.interview_style.communication_notes || '',
+      } : undefined,
+
+      // Numbers usage tracking
+      numbers_usage: result.numbers_usage ? {
+        numbers_mentioned: result.numbers_usage.numbers_mentioned || [],
+        numbers_used_in_design: result.numbers_usage.numbers_used_in_design || [],
+        numbers_not_used: result.numbers_usage.numbers_not_used || [],
+        violated_rule: result.numbers_usage.violated_rule ?? false,
+        violation_details: result.numbers_usage.violation_details,
+      } : undefined,
+
       style: {
         rating: result.style?.rating || 'adequate',
         assessment: result.style?.assessment || '',
@@ -585,6 +780,10 @@ Please provide detailed feedback on this candidate's system design interview, ev
           .map(gap => gap.topic)
 
     return {
+      // Google hiring rating
+      hiring_rating: result.hiring_rating || 'leaning_no_hire',
+      target_level: targetLevel,
+
       style_rating: result.style?.rating || 'adequate',
       completeness_rating: result.completeness?.rating || 'adequate',
 

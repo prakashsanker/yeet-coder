@@ -20,8 +20,36 @@ interface CodingFeedback {
   detailed_notes: string
 }
 
+// Google hiring rating type
+type GoogleHiringRating = 'strong_hire' | 'hire' | 'leaning_hire' | 'leaning_no_hire' | 'no_hire'
+type CandidateLevel = 'L4' | 'L5' | 'L6'
+
 // System design interview feedback - NEW structure with Style + Completeness
 interface SystemDesignFeedback {
+  // === HIRING RATING (displayed at top) ===
+  hiring_rating?: GoogleHiringRating
+  hiring_rating_rationale?: string
+  evaluated_at_level?: CandidateLevel
+
+  // === INTERVIEW STYLE BREAKDOWN ===
+  interview_style?: {
+    structure_followed: boolean
+    structure_assessment: string
+    time_management: 'good' | 'adequate' | 'poor'
+    time_management_notes: string
+    communication_style: 'collaborative' | 'monologue' | 'needs_prompting'
+    communication_notes: string
+  }
+
+  // === NUMBERS USAGE TRACKING ===
+  numbers_usage?: {
+    numbers_mentioned: string[]
+    numbers_used_in_design: string[]
+    numbers_not_used: string[]
+    violated_rule: boolean
+    violation_details?: string
+  }
+
   // === STYLE ASSESSMENT ===
   style: {
     rating: 'strong' | 'adequate' | 'needs_improvement'
@@ -104,6 +132,9 @@ interface EvaluationData {
   // System design qualitative ratings (NEW)
   style_rating?: 'strong' | 'adequate' | 'needs_improvement'
   completeness_rating?: 'comprehensive' | 'adequate' | 'incomplete'
+  // Google hiring rating
+  hiring_rating?: GoogleHiringRating
+  target_level?: CandidateLevel
   // Common fields
   overall_score?: number
   verdict?: 'PASS' | 'FAIL'
@@ -128,6 +159,7 @@ interface EvaluationData {
     transcript?: { speaker: string; text: string; timestamp: number }[]
     drawing_data?: { elements: unknown[] } | null
     notes?: string | null
+    target_level?: CandidateLevel
     question?: {
       id: string
       title: string
@@ -521,6 +553,53 @@ function RatingBadge({ rating }: {
   )
 }
 
+// Google Hiring Rating Badge
+function HiringRatingBadge({ rating, size = 'large' }: {
+  rating: GoogleHiringRating
+  size?: 'large' | 'small'
+}) {
+  const labels: Record<GoogleHiringRating, string> = {
+    strong_hire: 'Strong Hire',
+    hire: 'Hire',
+    leaning_hire: 'Leaning Hire',
+    leaning_no_hire: 'Leaning No Hire',
+    no_hire: 'No Hire',
+  }
+
+  const colors: Record<GoogleHiringRating, string> = {
+    strong_hire: 'bg-green-600 text-white',
+    hire: 'bg-green-500 text-white',
+    leaning_hire: 'bg-lime-500 text-white',
+    leaning_no_hire: 'bg-amber-500 text-white',
+    no_hire: 'bg-red-500 text-white',
+  }
+
+  const sizeClasses = size === 'large'
+    ? 'px-6 py-3 text-2xl font-bold'
+    : 'px-4 py-1.5 text-sm font-semibold'
+
+  return (
+    <span className={`inline-block rounded-lg ${colors[rating]} ${sizeClasses}`}>
+      {labels[rating]}
+    </span>
+  )
+}
+
+// Level badge
+function LevelBadge({ level }: { level: CandidateLevel }) {
+  const labels: Record<CandidateLevel, string> = {
+    L4: 'L4 (Junior)',
+    L5: 'L5 (Mid-Level)',
+    L6: 'L6 (Senior)',
+  }
+
+  return (
+    <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200">
+      Evaluated at {labels[level]}
+    </span>
+  )
+}
+
 // Importance badge for completeness gaps
 function ImportanceBadge({ importance }: { importance: 'critical' | 'important' | 'minor' }) {
   const colors: Record<string, string> = {
@@ -572,6 +651,125 @@ function SystemDesignEvaluationDisplay({ evaluation, onRetry, isRetrying }: {
               >
                 {isRetrying ? 'Retrying...' : 'Retry Evaluation'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* HIRING RATING - Displayed prominently at top */}
+        {feedback.hiring_rating && (
+          <div className="mb-8 p-8 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 text-center">
+            <div className="mb-4">
+              <HiringRatingBadge rating={feedback.hiring_rating} />
+            </div>
+            {feedback.evaluated_at_level && (
+              <div className="mb-4">
+                <LevelBadge level={feedback.evaluated_at_level} />
+              </div>
+            )}
+            {feedback.hiring_rating_rationale && (
+              <p className="text-landing-secondary mt-4 max-w-2xl mx-auto leading-relaxed">
+                {feedback.hiring_rating_rationale}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* NUMBERS USAGE WARNING - Show if rule was violated */}
+        {feedback.numbers_usage?.violated_rule && (
+          <div className="mb-8 p-6 rounded-lg bg-red-50 border border-red-200">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-red-800 mb-1">Numbers Not Used in Design</h3>
+                <p className="text-red-700 text-sm mb-3">
+                  You mentioned specific numbers but didn't use them to drive your design decisions. This is a common interview mistake.
+                </p>
+                {feedback.numbers_usage.numbers_not_used.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-red-800 mb-2">Numbers mentioned but not used:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {feedback.numbers_usage.numbers_not_used.map((num, i) => (
+                        <span key={i} className="px-2 py-1 bg-red-100 text-red-700 rounded text-sm">
+                          {num}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {feedback.numbers_usage.violation_details && (
+                  <p className="text-sm text-red-600 mt-3 italic">{feedback.numbers_usage.violation_details}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* INTERVIEW STYLE BREAKDOWN */}
+        {feedback.interview_style && (
+          <div className="mb-8 p-6 rounded-lg bg-white border border-black/10">
+            <h3 className="text-lg font-semibold text-landing-primary mb-4">Interview Style Breakdown</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Structure */}
+              <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-landing-primary">Structure</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    feedback.interview_style.structure_followed
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {feedback.interview_style.structure_followed ? 'Good' : 'Needs Work'}
+                  </span>
+                </div>
+                <p className="text-sm text-landing-muted">FR → NFR → HLD → LLD</p>
+                {feedback.interview_style.structure_assessment && (
+                  <p className="text-xs text-landing-secondary mt-2">{feedback.interview_style.structure_assessment}</p>
+                )}
+              </div>
+
+              {/* Time Management */}
+              <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-landing-primary">Time Management</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    feedback.interview_style.time_management === 'good'
+                      ? 'bg-green-100 text-green-700'
+                      : feedback.interview_style.time_management === 'adequate'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {feedback.interview_style.time_management.charAt(0).toUpperCase() + feedback.interview_style.time_management.slice(1)}
+                  </span>
+                </div>
+                <p className="text-sm text-landing-muted">5-7 min requirements, rest for design</p>
+                {feedback.interview_style.time_management_notes && (
+                  <p className="text-xs text-landing-secondary mt-2">{feedback.interview_style.time_management_notes}</p>
+                )}
+              </div>
+
+              {/* Communication */}
+              <div className="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-landing-primary">Communication</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    feedback.interview_style.communication_style === 'collaborative'
+                      ? 'bg-green-100 text-green-700'
+                      : feedback.interview_style.communication_style === 'monologue'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {feedback.interview_style.communication_style.charAt(0).toUpperCase() + feedback.interview_style.communication_style.slice(1).replace('_', ' ')}
+                  </span>
+                </div>
+                <p className="text-sm text-landing-muted">Collaborative, give interviewer chances</p>
+                {feedback.interview_style.communication_notes && (
+                  <p className="text-xs text-landing-secondary mt-2">{feedback.interview_style.communication_notes}</p>
+                )}
+              </div>
             </div>
           </div>
         )}

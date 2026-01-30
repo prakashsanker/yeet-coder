@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { api, ApiError, type Topic, type Question } from '../lib/api'
+import { api, ApiError, type Topic, type Question, type CandidateLevel } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../lib/admin'
 import AppHeader from '../components/common/AppHeader'
@@ -9,6 +9,21 @@ import { analytics } from '../lib/posthog'
 
 type InterviewType = 'leetcode' | 'system_design' | null
 type Step = 'type' | 'topic' | 'question' | 'confirm'
+
+const LEVEL_INFO: Record<CandidateLevel, { title: string; description: string }> = {
+  L4: {
+    title: 'L4 (Junior)',
+    description: 'Can solve with guidance, some gaps OK',
+  },
+  L5: {
+    title: 'L5 (Mid-Level)',
+    description: 'Must drive independently, 70%+ coverage expected',
+  },
+  L6: {
+    title: 'L6 (Senior)',
+    description: 'Must fully self-direct, 85%+ with expert depth',
+  },
+}
 
 interface LocationState {
   selectedQuestion?: Question
@@ -39,6 +54,7 @@ export default function Onboarding() {
     id: string
     session_type: 'coding' | 'system_design'
   } | null>(null)
+  const [targetLevel, setTargetLevel] = useState<CandidateLevel>('L5')
 
   const userIsAdmin = isAdmin(user)
 
@@ -147,6 +163,7 @@ export default function Onboarding() {
       const { interview } = await api.interviews.create({
         question_id: selectedQuestion.id,
         language: interviewType === 'leetcode' ? 'python' : undefined,
+        target_level: interviewType === 'system_design' ? targetLevel : undefined,
       })
 
       analytics.interviewCreated(interview.id, interview.session_type)
@@ -400,6 +417,47 @@ export default function Onboarding() {
               <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-3">{selectedQuestion.title}</h2>
               <p className="text-[var(--text-secondary)] text-sm leading-relaxed line-clamp-3">{selectedQuestion.description}</p>
             </div>
+
+            {/* Level selector (system design only) */}
+            {interviewType === 'system_design' && (
+              <div className="card p-6">
+                <h3 className="text-[var(--text-primary)] font-semibold mb-2">Evaluation Level</h3>
+                <p className="text-[var(--text-muted)] text-sm mb-4">
+                  Choose the level you want to be evaluated at. Higher levels have stricter expectations.
+                </p>
+                <div className="grid gap-2">
+                  {(['L4', 'L5', 'L6'] as CandidateLevel[]).map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setTargetLevel(level)}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                        targetLevel === level
+                          ? 'border-[var(--accent-purple)] bg-[#F3E5F5]'
+                          : 'border-[rgba(0,0,0,0.08)] hover:border-[var(--accent-purple)] hover:bg-[#FAFAFA]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          targetLevel === level
+                            ? 'border-[var(--accent-purple)] bg-[var(--accent-purple)]'
+                            : 'border-[rgba(0,0,0,0.2)]'
+                        }`}>
+                          {targetLevel === level && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <span className="font-medium text-[var(--text-primary)]">{LEVEL_INFO[level].title}</span>
+                          <span className="text-[var(--text-muted)] text-sm ml-2">{LEVEL_INFO[level].description}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* How it works */}
             <div className="card p-6">

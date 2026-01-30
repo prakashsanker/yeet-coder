@@ -110,9 +110,26 @@ function buildQuestionPrompt(input: GenerateQuestionsInput): string {
   }
 
   const typeGuidelines = {
-    multiple_choice: `Generate multiple choice questions with exactly 4 options (A, B, C, D). Only one option should be correct. Make the wrong options plausible but clearly incorrect to someone who understands the concept.`,
+    multiple_choice: `Generate multiple choice questions with exactly 4 options (A, B, C, D). Only one option should be correct.
+
+CRITICAL: All options must be semantically consistent with what the question asks:
+- If asking for a "trade-off" or "disadvantage", ALL options must be trade-offs/disadvantages (not benefits)
+- If asking for a "benefit" or "advantage", ALL options must be benefits (not drawbacks)
+- If asking "when to use X", ALL options must be valid scenarios (not definitions)
+
+Wrong options should be plausible alternatives that require real understanding to distinguish from the correct answer. A test-taker should not be able to eliminate options just because they're in the wrong category.
+
+Example of BAD options for "What is a trade-off of caching?":
+- A) Faster response times (WRONG - this is a benefit, not trade-off)
+- B) Memory overhead (correct trade-off)
+
+Example of GOOD options for "What is a trade-off of caching?":
+- A) Cache invalidation complexity (plausible trade-off)
+- B) Memory overhead (correct trade-off)
+- C) Increased storage costs (plausible trade-off)
+- D) Potential for stale data (plausible trade-off)`,
     true_false: `Generate true/false questions. Make the statements specific enough that they are clearly true or false, not ambiguous. Include common misconceptions as false statements.`,
-    scenario: `Generate scenario-based questions that describe a real-world situation and ask what the best approach would be. Include 4 options (A, B, C, D) representing different approaches.`,
+    scenario: `Generate scenario-based questions that describe a real-world situation and ask what the best approach would be. Include 4 options (A, B, C, D) representing different approaches. All options should be valid approaches - the question tests which is BEST, not which is obviously wrong.`,
   }
 
   return `You are an expert system design interviewer creating practice questions.

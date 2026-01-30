@@ -133,6 +133,7 @@ export interface InterviewSession {
   // System design specific
   drawing_data?: ExcalidrawData | null
   notes?: string | null
+  target_level?: CandidateLevel
 }
 
 export interface TranscriptEntry {
@@ -141,10 +142,22 @@ export interface TranscriptEntry {
   text: string
 }
 
+// Google-style candidate levels
+export type CandidateLevel = 'L4' | 'L5' | 'L6'
+
+// Google-style hiring ratings
+export type GoogleHiringRating =
+  | 'strong_hire'
+  | 'hire'
+  | 'leaning_hire'
+  | 'leaning_no_hire'
+  | 'no_hire'
+
 export interface CreateInterviewParams {
   question_id: string
   language?: string
   time_limit_seconds?: number
+  target_level?: CandidateLevel
 }
 
 export interface UpdateInterviewParams {
@@ -385,6 +398,31 @@ export interface CodingFeedback {
 
 // System design interview feedback
 export interface SystemDesignFeedback {
+  // New: Hiring rating (displayed at top)
+  hiring_rating?: GoogleHiringRating
+  hiring_rating_rationale?: string
+  evaluated_at_level?: CandidateLevel
+
+  // New: Interview style breakdown
+  interview_style?: {
+    structure_followed: boolean
+    structure_assessment: string
+    time_management: 'good' | 'adequate' | 'poor'
+    time_management_notes: string
+    communication_style: 'collaborative' | 'monologue' | 'needs_prompting'
+    communication_notes: string
+  }
+
+  // New: Numbers usage tracking
+  numbers_usage?: {
+    numbers_mentioned: string[]
+    numbers_used_in_design: string[]
+    numbers_not_used: string[]
+    violated_rule: boolean
+    violation_details?: string
+  }
+
+  // Existing fields
   summary: string
   good_points: string[]
   areas_for_improvement: string[]
@@ -421,6 +459,9 @@ export interface Evaluation {
   api_design_score?: number
   trade_offs_score?: number
   communication_score?: number
+  // Google hiring rating
+  hiring_rating?: GoogleHiringRating
+  target_level?: CandidateLevel
   // Common fields
   overall_score?: number
   verdict?: 'PASS' | 'FAIL'
